@@ -1,0 +1,12 @@
+# Build output & binaries
+CameraWebServer/build/
+*.bin
+*.elf
+*.map
+
+# OS / Editor files
+.DS_Store
+*.swp
+*~
+.vscode/
+.idea/
