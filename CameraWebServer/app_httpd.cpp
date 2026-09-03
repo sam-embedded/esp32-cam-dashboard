@@ -118,7 +118,20 @@ static esp_err_t index_handler(httpd_req_t* req) {
     httpd_resp_set_type(req, "text/html");
     httpd_resp_set_hdr(req, "Cache-Control", "no-cache, no-store, must-revalidate");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    return httpd_resp_send(req, index_html, strlen(index_html));
+
+    const char* p = index_html;
+    size_t remaining = strlen(index_html);
+    while (remaining > 0) {
+        size_t chunk_len = (remaining > 2048) ? 2048 : remaining;
+        if (httpd_resp_send_chunk(req, p, chunk_len) != ESP_OK) {
+            httpd_resp_send_chunk(req, nullptr, 0);
+            return ESP_FAIL;
+        }
+        p += chunk_len;
+        remaining -= chunk_len;
+    }
+    httpd_resp_send_chunk(req, nullptr, 0);
+    return ESP_OK;
 }
 
 // ─── JPEG capture + SD save ───────────────────────────────────
