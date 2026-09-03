@@ -105,25 +105,11 @@ static void wifiEventHandler(WiFiEvent_t event) {
             g_wifi_connected = true;
             g_ap_fallback    = false;
             Serial.printf("[WiFi] Connected! IP: %s\n", WiFi.localIP().toString().c_str());
-            // Notify Telegram (queue it – might not be ready yet)
-            if (g_tg_ready) {
-                char buf[180];
-                snprintf(buf, sizeof(buf),
-                    "✅ WiFi connected!\nIP: `%s`\nURL: http://esp32cam.local\nHeap: %dKB",
-                    WiFi.localIP().toString().c_str(),
-                    esp_get_free_heap_size() / 1024
-                );
-                telegram_send_message(buf);
-            }
             break;
 
         case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
-            if (g_wifi_connected) {
-                g_wifi_connected = false;
-                g_wifi_lost_ms   = millis();
-                Serial.println("[WiFi] Disconnected – watchdog will reconnect");
-                if (g_tg_ready) telegram_send_message("📡 WiFi disconnected! Attempting reconnect...");
-            }
+            g_wifi_connected = false;
+            Serial.println("[WiFi] Disconnected – will auto-reconnect");
             break;
 
         default: break;
@@ -132,47 +118,68 @@ static void wifiEventHandler(WiFiEvent_t event) {
 
 // ─── WiFi Watchdog task ───────────────────────────────────────
 static void TaskWiFiWatchdog(void* pvParameters) {
-    uint32_t backoff   = 10000;   // start at 10s
-    uint32_t attempts  = 0;
-    uint32_t lastCheck = 0;
+    uint32_t disconnected_since = 0;
+    uint32_t attempts = 0;
 
     for (;;) {
-        vTaskDelay(pdMS_TO_TICKS(2000));
-        if (g_wifi_connected) {
-            backoff  = 10000;
+        vTaskDelay(pdMS_TO_TICKS(3000));
+
+        // If WiFi is connected, reset watchdog and sleep
+        if (WiFi.status() == WL_CONNECTED) {
+            disconnected_since = 0;
             attempts = 0;
+            g_wifi_connected = true;
             continue;
         }
-        // Disconnected: wait backoff then retry
-        uint32_t lost_for = millis() - g_wifi_lost_ms;
-        if (lost_for < backoff) continue;
+
+        g_wifi_connected = false;
+
+        // Mark the time disconnection started
+        if (disconnected_since == 0) {
+            disconnected_since = millis();
+            continue;
+        }
+
+        // Wait at least 15 seconds before taking action (give built-in auto-reconnect a chance)
+        if (millis() - disconnected_since < 15000) {
+            continue;
+        }
 
         attempts++;
-        Serial.printf("[WiFi] Reconnect attempt %u (backoff %us)\n", attempts, backoff/1000);
+        Serial.printf("[WiFi] Watchdog: offline for %lu s, reconnect attempt %u\n",
+                      (millis() - disconnected_since) / 1000, attempts);
+
         String ssid = preferences.getString("wifi_ssid", "FTTH");
         String pass = preferences.getString("wifi_pass", "Selva@home");
-        WiFi.disconnect(true);
-        delay(500);
+
+        WiFi.disconnect();
+        vTaskDelay(pdMS_TO_TICKS(500));
         WiFi.begin(ssid.c_str(), pass.c_str());
 
-        // Exponential backoff (cap at 60s)
-        backoff = min(backoff * 2, (uint32_t)60000);
-        g_wifi_lost_ms = millis();  // reset timer
+        // Wait up to 10s for reconnect
+        uint32_t wait_start = millis();
+        while (WiFi.status() != WL_CONNECTED && millis() - wait_start < 10000) {
+            vTaskDelay(pdMS_TO_TICKS(500));
+        }
+
+        if (WiFi.status() == WL_CONNECTED) {
+            Serial.printf("[WiFi] Reconnected successfully! IP: %s\n", WiFi.localIP().toString().c_str());
+            disconnected_since = 0;
+            attempts = 0;
+            g_wifi_connected = true;
+            continue;
+        }
 
         if (attempts >= 5) {
-            // Fall back to AP mode
-            Serial.println("[WiFi] Max retries – starting SoftAP fallback");
-            WiFi.disconnect(true);
+            Serial.println("[WiFi] Max retries reached – starting SoftAP fallback");
+            WiFi.disconnect();
             WiFi.mode(WIFI_AP);
             WiFi.softAP("ESP32-CAM-AP", "esp32cam1234");
-            g_ap_fallback    = true;
-            g_wifi_connected = false;
-            if (g_tg_ready) telegram_send_message("⚠️ WiFi failed! Started AP: *ESP32-CAM-AP* (pass: esp32cam1234)");
-            // Reset for next attempt cycle in 5 minutes
-            vTaskDelay(pdMS_TO_TICKS(300000));
-            attempts  = 0;
-            backoff   = 10000;
-            g_wifi_lost_ms = millis();
+            g_ap_fallback = true;
+            // Stay in AP mode for 3 minutes before retrying STA
+            vTaskDelay(pdMS_TO_TICKS(180000));
+            attempts = 0;
+            disconnected_since = millis();
             WiFi.mode(WIFI_STA);
             WiFi.begin(ssid.c_str(), pass.c_str());
         }
