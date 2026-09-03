@@ -80,29 +80,26 @@ static esp_err_t stream_handler(httpd_req_t* req) {
     while (true) {
         camera_fb_t* fb = nullptr;
 
-        if (xSemaphoreTake(camera_mutex, pdMS_TO_TICKS(500)) == pdTRUE) {
+        if (xSemaphoreTake(camera_mutex, pdMS_TO_TICKS(200)) == pdTRUE) {
             fb = esp_camera_fb_get();
-            if (!fb) {
-                xSemaphoreGive(camera_mutex);
-                vTaskDelay(pdMS_TO_TICKS(10));
-                continue;
-            }
-
-            res = httpd_resp_send_chunk(req, STREAM_BOUNDARY, strlen(STREAM_BOUNDARY));
-            if (res == ESP_OK) {
-                size_t hlen = snprintf(part_buf, sizeof(part_buf), STREAM_PART, fb->len, millis());
-                res = httpd_resp_send_chunk(req, part_buf, hlen);
-            }
-            if (res == ESP_OK) {
-                res = httpd_resp_send_chunk(req, (const char*)fb->buf, fb->len);
-            }
-
-            esp_camera_fb_return(fb);
             xSemaphoreGive(camera_mutex);
-        } else {
+        }
+
+        if (!fb) {
             vTaskDelay(pdMS_TO_TICKS(10));
             continue;
         }
+
+        res = httpd_resp_send_chunk(req, STREAM_BOUNDARY, strlen(STREAM_BOUNDARY));
+        if (res == ESP_OK) {
+            size_t hlen = snprintf(part_buf, sizeof(part_buf), STREAM_PART, fb->len, millis());
+            res = httpd_resp_send_chunk(req, part_buf, hlen);
+        }
+        if (res == ESP_OK) {
+            res = httpd_resp_send_chunk(req, (const char*)fb->buf, fb->len);
+        }
+
+        esp_camera_fb_return(fb);
 
         if (res != ESP_OK) break;   // Client closed connection or network dropped
 
@@ -119,7 +116,8 @@ static esp_err_t stream_handler(httpd_req_t* req) {
 // ─── Dashboard HTML ───────────────────────────────────────────
 static esp_err_t index_handler(httpd_req_t* req) {
     httpd_resp_set_type(req, "text/html");
-    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache, no-store, must-revalidate");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     return httpd_resp_send(req, index_html, strlen(index_html));
 }
 
@@ -128,15 +126,15 @@ static esp_err_t capture_handler(httpd_req_t* req) {
     camera_fb_t* fb = nullptr;
     if (xSemaphoreTake(camera_mutex, pdMS_TO_TICKS(3000)) == pdTRUE) {
         fb = esp_camera_fb_get();
+        xSemaphoreGive(camera_mutex);  // Release immediately after get
     }
     if (!fb) {
-        xSemaphoreGive(camera_mutex);
         httpd_resp_send_500(req);
         return ESP_FAIL;
     }
-    // Save to SD
+    // Save to SD (save before returning buffer so buf is still valid)
     sd_save_photo(fb->buf, fb->len);
-    // Also queue Telegram photo
+    // Queue Telegram photo
     telegram_send_photo("📸 Manual capture");
 
     httpd_resp_set_type(req, "image/jpeg");
@@ -144,7 +142,6 @@ static esp_err_t capture_handler(httpd_req_t* req) {
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     esp_err_t res = httpd_resp_send(req, (const char*)fb->buf, fb->len);
     esp_camera_fb_return(fb);
-    xSemaphoreGive(camera_mutex);
     return res;
 }
 
@@ -372,6 +369,17 @@ static esp_err_t restart_handler(httpd_req_t* req) {
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_send(req, "{\"ok\":true}", 10);
 
+    if (!strcmp(type, "soft")) {
+        telegram_send_message("🔄 Device restarting (soft requested)");
+        delay(800);
+        ESP.restart();
+        return ESP_OK;
+    } else if (!strcmp(type, "hard")) {
+        telegram_send_message("🔄 Device restarting (hard requested)");
+        delay(800);
+        esp_restart();
+        return ESP_OK;
+    }
     if (!strcmp(type, "erase_nvs")) {
         telegram_send_message("🔄 NVS erased – rebooting!");
         delay(500);

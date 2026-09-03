@@ -187,18 +187,21 @@ void TaskRecording(void* pvParameters) {
             }
         }
 
-        if (xSemaphoreTake(g_sd_mutex, pdMS_TO_TICKS(2000)) != pdTRUE) {
-            vTaskDelay(pdMS_TO_TICKS(1000));
-            continue;
-        }
-
         String path = "/videos/VID_" + getTimestamp() + ".avi";
-        File f = SD_MMC.open(path.c_str(), FILE_WRITE);
-        if (!f) {
-            xSemaphoreGive(g_sd_mutex);
-            Serial.printf("[REC] Failed to create %s\n", path.c_str());
-            vTaskDelay(pdMS_TO_TICKS(5000));
-            continue;
+        File f;
+        {
+            if (xSemaphoreTake(g_sd_mutex, pdMS_TO_TICKS(2000)) != pdTRUE) {
+                vTaskDelay(pdMS_TO_TICKS(1000));
+                continue;
+            }
+            f = SD_MMC.open(path.c_str(), FILE_WRITE);
+            if (!f) {
+                xSemaphoreGive(g_sd_mutex);
+                Serial.printf("[REC] Failed to create %s\n", path.c_str());
+                vTaskDelay(pdMS_TO_TICKS(5000));
+                continue;
+            }
+            xSemaphoreGive(g_sd_mutex);  // Release – individual frame writes take it back
         }
 
         Serial.printf("[REC] Recording started: %s (%u min @ %u fps)\n", path.c_str(), interval_min, fps);
@@ -305,26 +308,31 @@ void TaskRecording(void* pvParameters) {
             if (xSemaphoreTake(camera_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                 camera_fb_t* fb = esp_camera_fb_get();
                 if (fb && fb->format == PIXFORMAT_JPEG && fb->len > 0) {
-                    frame_copy = (uint8_t*)malloc(fb->len);
+                    frame_copy = (uint8_t*)ps_malloc(fb->len);  // Use PSRAM for large frame copies
+                    if (!frame_copy) frame_copy = (uint8_t*)malloc(fb->len);
                     if (frame_copy) {
                         frame_copy_len = fb->len;
                         memcpy(frame_copy, fb->buf, frame_copy_len);
                     }
                 }
                 if (fb) esp_camera_fb_return(fb);
-                xSemaphoreGive(camera_mutex); // Release mutex immediately in < 1ms!
+                xSemaphoreGive(camera_mutex);
             }
 
             if (frame_copy && frame_copy_len > 0) {
-                uint32_t frame_offset = f.position() - moviStart - 4;
-                writeFCC(f, "00dc");
-                writeU32LE(f, frame_copy_len);
-                writeSdChunked(f, frame_copy, frame_copy_len);
-                if (frame_copy_len & 1) {
-                    f.write((uint8_t)0); // 2-byte alignment padding
+                // Take SD mutex only for the brief write operation
+                if (xSemaphoreTake(g_sd_mutex, pdMS_TO_TICKS(500)) == pdTRUE) {
+                    uint32_t frame_offset = f.position() - moviStart - 4;
+                    writeFCC(f, "00dc");
+                    writeU32LE(f, frame_copy_len);
+                    writeSdChunked(f, frame_copy, frame_copy_len);
+                    if (frame_copy_len & 1) {
+                        f.write((uint8_t)0); // 2-byte alignment padding
+                    }
+                    xSemaphoreGive(g_sd_mutex);
+                    index_entries.push_back({frame_offset, (uint32_t)frame_copy_len});
+                    frame_count++;
                 }
-                index_entries.push_back({frame_offset, (uint32_t)frame_copy_len});
-                frame_count++;
                 free(frame_copy);
             }
 
@@ -338,48 +346,55 @@ void TaskRecording(void* pvParameters) {
 
         // ── 4. Finalize AVI Headers & Index ──
         if (frame_count > 0) {
-            uint32_t end_movi = f.position();
-            patchU32(f, moviSzPos, end_movi - moviSzPos - 4);
+            if (xSemaphoreTake(g_sd_mutex, pdMS_TO_TICKS(5000)) == pdTRUE) {
+                uint32_t end_movi = f.position();
+                patchU32(f, moviSzPos, end_movi - moviSzPos - 4);
 
-            // Write idx1 chunk
-            writeFCC(f, "idx1");
-            writeU32LE(f, index_entries.size() * 16);
-            for (const auto& idx : index_entries) {
-                writeFCC(f, "00dc");
-                writeU32LE(f, 0x10); // AVIIF_KEYFRAME
-                writeU32LE(f, idx.offset);
-                writeU32LE(f, idx.size);
+                // Write idx1 chunk
+                writeFCC(f, "idx1");
+                writeU32LE(f, index_entries.size() * 16);
+                for (const auto& idx : index_entries) {
+                    writeFCC(f, "00dc");
+                    writeU32LE(f, 0x10); // AVIIF_KEYFRAME
+                    writeU32LE(f, idx.offset);
+                    writeU32LE(f, idx.size);
+                }
+
+                // Patch RIFF size
+                uint32_t total_file_size = f.position();
+                patchU32(f, riffSzPos, total_file_size - 8);
+
+                // Patch frame counts
+                patchU32(f, avihFramesPos, frame_count);
+                patchU32(f, strhFramesPos, frame_count);
+
+                f.flush();
+                f.close();
+                xSemaphoreGive(g_sd_mutex);
+
+                char msg[200];
+                snprintf(msg, sizeof(msg), "🎬 Video saved: %s (%uKB, %u frames)",
+                         path.c_str(), total_file_size / 1024, frame_count);
+                Serial.println(msg);
+                telegram_send_message(msg);
+
+                if (xSemaphoreTake(g_sd_mutex, pdMS_TO_TICKS(2000)) == pdTRUE) {
+                    autoCleanVideos();
+                    xSemaphoreGive(g_sd_mutex);
+                }
             }
-
-            // Patch RIFF size
-            uint32_t total_file_size = f.position();
-            patchU32(f, riffSzPos, total_file_size - 8);
-
-            // Patch frame counts
-            patchU32(f, avihFramesPos, frame_count);
-            patchU32(f, strhFramesPos, frame_count);
-
-            f.flush();
-            f.close();
-
-            char msg[200];
-            snprintf(msg, sizeof(msg), "🎬 Video saved: %s (%uKB, %u frames)",
-                     path.c_str(), total_file_size / 1024, frame_count);
-            Serial.println(msg);
-            telegram_send_message(msg);
-
-            autoCleanVideos();
         } else {
             f.close();
-            SD_MMC.remove(path.c_str());
+            if (xSemaphoreTake(g_sd_mutex, pdMS_TO_TICKS(2000)) == pdTRUE) {
+                SD_MMC.remove(path.c_str());
+                xSemaphoreGive(g_sd_mutex);
+            }
         }
-
-        xSemaphoreGive(g_sd_mutex);
     }
 }
 
 void recording_init() {
-    xTaskCreatePinnedToCore(TaskRecording, "TaskRecording", 8192, nullptr, 1, nullptr, 0);
+    xTaskCreatePinnedToCore(TaskRecording, "TaskRecording", 12288, nullptr, 1, nullptr, 0);
 }
 
 // ─── Uptime formatter ─────────────────────────────────────────

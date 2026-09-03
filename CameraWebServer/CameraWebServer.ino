@@ -48,7 +48,7 @@ static bool initCamera() {
     config.pin_sccb_scl = SIOC_GPIO_NUM;
     config.pin_pwdn  = PWDN_GPIO_NUM;
     config.pin_reset = RESET_GPIO_NUM;
-    config.xclk_freq_hz = 16500000;       // 16.5MHz is optimal for OV2640 + PSRAM to prevent FB-OVF
+    config.xclk_freq_hz = 20000000;       // 20MHz standard for OV2640 + PSRAM
     config.pixel_format = PIXFORMAT_JPEG;
     config.grab_mode    = CAMERA_GRAB_LATEST; // Always grab the freshest frame (zero lag)
     if (psramFound()) {
@@ -137,7 +137,7 @@ static void TaskWiFiWatchdog(void* pvParameters) {
     uint32_t lastCheck = 0;
 
     for (;;) {
-        vTaskDelay(pdMS_TO_TICKS(5000));
+        vTaskDelay(pdMS_TO_TICKS(2000));
         if (g_wifi_connected) {
             backoff  = 10000;
             attempts = 0;
@@ -299,8 +299,8 @@ void setup() {
 
     Serial.println("[BOOT] All tasks started");
 
-    // Boot notification
-    delay(2000);  // let Telegram task settle
+    // Boot notification – yield to FreeRTOS scheduler while Telegram task starts
+    vTaskDelay(pdMS_TO_TICKS(1500));
     char bootMsg[280];
     snprintf(bootMsg, sizeof(bootMsg),
         "🚀 *ESP32-CAM Booted!*\n"

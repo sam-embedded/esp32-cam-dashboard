@@ -7,21 +7,29 @@ bool ntp_sync_time(long gmtOffsetSec, int dstOffsetSec) {
     if (WiFi.status() != WL_CONNECTED) return false;
 
     configTime(gmtOffsetSec, dstOffsetSec, "pool.ntp.org", "time.nist.gov", "time.google.com");
-    
-    time_t now = 0;
-    struct tm timeinfo;
-    uint32_t t0 = millis();
-    while (millis() - t0 < 3000) {
-        time(&now);
-        if (now > 1700000000) {
-            localtime_r(&now, &timeinfo);
-            char buf[64];
-            strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &timeinfo);
-            Serial.printf("[NTP] Time synchronized: %s\n", buf);
-            return true;
+
+    // Try up to 2 attempts with 5s each
+    for (int attempt = 0; attempt < 2; attempt++) {
+        time_t now = 0;
+        struct tm timeinfo;
+        uint32_t t0 = millis();
+        while (millis() - t0 < 5000) {
+            time(&now);
+            if (now > 1700000000) {
+                localtime_r(&now, &timeinfo);
+                char buf[64];
+                strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &timeinfo);
+                Serial.printf("[NTP] Synchronized: %s\n", buf);
+                return true;
+            }
+            delay(200);
         }
-        delay(100);
+        if (attempt == 0) {
+            // Retry with alternative servers
+            configTime(gmtOffsetSec, dstOffsetSec, "time.cloudflare.com", "pool.ntp.org", "time.google.com");
+        }
     }
+    Serial.println("[NTP] Sync timed out");
     return false;
 }
 

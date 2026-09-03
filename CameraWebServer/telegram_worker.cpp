@@ -21,45 +21,47 @@
 #include "lwip/tcpip.h"
 #include "lwip/netdb.h"
 
-// ─── Custom WiFiClientSecure with TCPIP Core Lock Protection ───
+// ─── Custom WiFiClientSecure with safe DNS resolution ──────────
 class TelegramClient : public WiFiClientSecure {
 public:
     TelegramClient() {
         setInsecure();
-        setTimeout(8);
-        setHandshakeTimeout(8);
+        setTimeout(10);
+        setHandshakeTimeout(10);
     }
 
     int connect(const char* host, uint16_t port) override {
         setInsecure();
 
-        // 1. Direct Telegram core IPv4 endpoints with SNI host
+        // 1. Try direct Telegram core IPv4 endpoints (no DNS needed, no lock needed)
         static const IPAddress TG_IPV4[] = {
-            IPAddress(149, 154, 166, 110),
             IPAddress(149, 154, 167, 220),
+            IPAddress(149, 154, 166, 110),
             IPAddress(91, 108, 56, 170)
         };
 
         for (const auto& tip : TG_IPV4) {
-            LOCK_TCPIP_CORE();
+            // mbedTLS handles its own thread safety – no TCPIP core lock needed here
             int ret = WiFiClientSecure::connect(tip, port, host, nullptr, nullptr, nullptr);
-            UNLOCK_TCPIP_CORE();
             if (ret > 0) return ret;
         }
 
-        // 2. Thread-safe DNS resolution with TCPIP core lock
+        // 2. DNS resolution – ONLY this call needs the TCPIP lock
         IPAddress resolvedIP;
-        LOCK_TCPIP_CORE();
-        struct hostent* he = gethostbyname(host);
-        if (he && he->h_addr_list && he->h_addr_list[0]) {
-            resolvedIP = IPAddress((const uint8_t*)he->h_addr_list[0]);
+        {
+            LOCK_TCPIP_CORE();
+            struct hostent* he = gethostbyname(host);
+            if (he && he->h_addr_list && he->h_addr_list[0]) {
+                resolvedIP = IPAddress((const uint8_t*)he->h_addr_list[0]);
+            }
+            UNLOCK_TCPIP_CORE();
         }
-        int ret = 0;
+
         if (resolvedIP) {
-            ret = WiFiClientSecure::connect(resolvedIP, port, host, nullptr, nullptr, nullptr);
+            // TLS connect without holding TCPIP lock
+            return WiFiClientSecure::connect(resolvedIP, port, host, nullptr, nullptr, nullptr);
         }
-        UNLOCK_TCPIP_CORE();
-        return ret;
+        return 0;
     }
 
     int connect(const char* host, uint16_t port, int32_t timeout) override {
@@ -326,9 +328,11 @@ void TaskTelegram(void* pvParameters) {
     uint32_t pollTick = 0;
 
     for (;;) {
+        bool did_job = false;
         TgJob job;
         // ── 1. Process outbound message queue ──
         while (xQueueReceive(g_tg_queue, &job, 0) == pdTRUE) {
+            did_job = true;
             if (job.type == TG_JOB_TEXT) {
                 for (const auto& cid : tg_chat_ids) {
                     g_bot->sendMessage(cid, String(job.text), "Markdown");
@@ -370,7 +374,7 @@ void TaskTelegram(void* pvParameters) {
         }
 
         // ── 2. Poll incoming Telegram commands ──
-        if (millis() - pollTick > 3000) {
+        if (millis() - pollTick > 2000 || did_job) {
             pollTick = millis();
             if (WiFi.status() == WL_CONNECTED && !tg_token.isEmpty()) {
                 int numNew = g_bot->getUpdates(g_bot->last_message_received + 1);
