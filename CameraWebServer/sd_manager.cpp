@@ -29,12 +29,17 @@ static void writeU32LE(File& f, uint32_t v) {
 static void writeFCC(File& f, const char* cc) {
     f.write((uint8_t*)cc, 4);
 }
+// Static DMA-capable bounce buffer in internal DRAM, 4-byte aligned (2048 bytes = 4 SD sectors)
+// Guaranteed DMA-capable so ESP-IDF sdmmc driver never needs to dynamically allocate bounce buffers
+static uint8_t s_sd_dma_chunk[2048] __attribute__((aligned(4)));
+
 static void writeSdChunked(File& f, const uint8_t* buf, size_t len) {
     if (!buf || len == 0) return;
     size_t written = 0;
     while (written < len) {
-        size_t toWrite = min((size_t)2048, len - written);
-        f.write(buf + written, toWrite);
+        size_t toWrite = min((size_t)sizeof(s_sd_dma_chunk), len - written);
+        memcpy(s_sd_dma_chunk, buf + written, toWrite);
+        f.write(s_sd_dma_chunk, toWrite);
         written += toWrite;
     }
 }
@@ -189,19 +194,16 @@ void TaskRecording(void* pvParameters) {
 
         String path = "/videos/VID_" + getTimestamp() + ".avi";
         File f;
-        {
-            if (xSemaphoreTake(g_sd_mutex, pdMS_TO_TICKS(2000)) != pdTRUE) {
-                vTaskDelay(pdMS_TO_TICKS(1000));
-                continue;
-            }
-            f = SD_MMC.open(path.c_str(), FILE_WRITE);
-            if (!f) {
-                xSemaphoreGive(g_sd_mutex);
-                Serial.printf("[REC] Failed to create %s\n", path.c_str());
-                vTaskDelay(pdMS_TO_TICKS(5000));
-                continue;
-            }
-            xSemaphoreGive(g_sd_mutex);  // Release – individual frame writes take it back
+        if (xSemaphoreTake(g_sd_mutex, pdMS_TO_TICKS(2000)) != pdTRUE) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            continue;
+        }
+        f = SD_MMC.open(path.c_str(), FILE_WRITE);
+        if (!f) {
+            xSemaphoreGive(g_sd_mutex);
+            Serial.printf("[REC] Failed to create %s\n", path.c_str());
+            vTaskDelay(pdMS_TO_TICKS(5000));
+            continue;
         }
 
         Serial.printf("[REC] Recording started: %s (%u min @ %u fps)\n", path.c_str(), interval_min, fps);
@@ -296,6 +298,9 @@ void TaskRecording(void* pvParameters) {
 
         uint32_t start_ms = millis();
         uint32_t frame_count = 0;
+
+        // Release SD mutex so file manager / delete / download can access SD card between frames
+        xSemaphoreGive(g_sd_mutex);
 
         while (millis() - start_ms < target_duration_ms) {
             if (!preferences.getBool("rec_enabled", true)) break;
