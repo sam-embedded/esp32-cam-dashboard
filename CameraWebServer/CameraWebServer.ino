@@ -15,6 +15,7 @@
 #include "sd_manager.h"
 #include "app_httpd.h"
 #include "ntp_sync.h"
+#include <lwip/dns.h>
 
 // ─── Shared globals ───────────────────────────────────────────
 Preferences        preferences;
@@ -130,6 +131,16 @@ static void wifiEventHandler(WiFiEvent_t event) {
             g_wifi_connected = true;
             g_ap_fallback    = false;
             Serial.printf("[WiFi] Connected! IP: %s\n", WiFi.localIP().toString().c_str());
+
+            // Force robust public DNS servers (bypasses dead or misconfigured router DNS)
+            {
+                ip_addr_t d1, d2;
+                ipaddr_aton("8.8.8.8", &d1);
+                ipaddr_aton("1.1.1.1", &d2);
+                dns_setserver(0, &d1);
+                dns_setserver(1, &d2);
+            }
+
             initMDNS();
             g_send_wifi_connect_notify = true;
             break;
