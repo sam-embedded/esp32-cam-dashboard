@@ -7,7 +7,6 @@
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <Preferences.h>
-#include <ArduinoOTA.h>
 #include <esp_system.h>
 #include "esp_camera.h"
 #include "camera_pins.h"
@@ -98,6 +97,28 @@ static bool initCamera() {
     return true;
 }
 
+// ─── mDNS service init / re-announce ──────────────────────────
+static void initMDNS() {
+    MDNS.end();
+    String hostname = preferences.getString("mdns_name", "esp32cam");
+    hostname.toLowerCase();
+    hostname.replace("_", "-");
+    hostname.trim();
+    if (hostname.isEmpty()) hostname = "esp32cam";
+
+    if (MDNS.begin(hostname.c_str())) {
+        MDNS.setInstanceName("ESP32-CAM Video Streamer");
+        MDNS.addService("http", "tcp", 80);
+        MDNS.addServiceTxt("http", "tcp", "version", "2.0");
+        MDNS.addServiceTxt("http", "tcp", "path", "/");
+        MDNS.addService("stream", "tcp", 81);
+        MDNS.addServiceTxt("stream", "tcp", "path", "/stream");
+        Serial.printf("[mDNS] Responding at http://%s.local\n", hostname.c_str());
+    } else {
+        Serial.println("[mDNS] Failed to start mDNS service");
+    }
+}
+
 // ─── WiFi event handler ───────────────────────────────────────
 static void wifiEventHandler(WiFiEvent_t event) {
     switch (event) {
@@ -105,6 +126,7 @@ static void wifiEventHandler(WiFiEvent_t event) {
             g_wifi_connected = true;
             g_ap_fallback    = false;
             Serial.printf("[WiFi] Connected! IP: %s\n", WiFi.localIP().toString().c_str());
+            initMDNS();
             break;
 
         case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
@@ -216,7 +238,13 @@ static void TaskTelemetry(void* pvParameters) {
                 snprintf(buf, sizeof(buf), "⚠️ Low memory alert! Free heap: %dKB", heap/1024);
                 telegram_send_message(buf);
             }
-            if (!ntp_is_synchronized()) {
+        }
+
+        // Active NTP synchronization retry every 10s until synchronized
+        static uint32_t lastNtpRetry = 0;
+        if (!ntp_is_synchronized() && WiFi.status() == WL_CONNECTED) {
+            if (millis() - lastNtpRetry > 10000) {
+                lastNtpRetry = millis();
                 long gmtOffset = preferences.getLong("ntp_offset", 19800);
                 int dstOffset  = preferences.getInt("ntp_dst", 0);
                 ntp_sync_time(gmtOffset, dstOffset);
@@ -277,18 +305,18 @@ void setup() {
         Serial.println("[WiFi] Initial connect timed out – watchdog will retry");
     }
 
-    // mDNS
-    String hostname = preferences.getString("mdns_name", "esp32cam");
-    if (MDNS.begin(hostname.c_str())) {
-        MDNS.addService("http", "tcp", 80);
-        Serial.printf("[mDNS] http://%s.local\n", hostname.c_str());
-    }
+    // mDNS service registration
+    initMDNS();
 
-    // Time sync (Direct UDP NTP with multi-server fallback: Google, Cloudflare, NIST)
+    // Time sync (Background SNTP daemon with immediate check)
     long gmtOffset = preferences.getLong("ntp_offset", 19800); // 19800 = +5:30 (IST)
     int dstOffset  = preferences.getInt("ntp_dst", 0);
     ntp_sync_time(gmtOffset, dstOffset);
-    Serial.printf("[NTP] Time synchronized: %s\n", ntp_get_formatted_time().c_str());
+    if (ntp_is_synchronized()) {
+        Serial.printf("[NTP] Time synchronized: %s\n", ntp_get_formatted_time().c_str());
+    } else {
+        Serial.println("[NTP] Background time sync initiated...");
+    }
 
     // SD card (init after WiFi so Telegram is ready for SD notifications)
     sd_manager_init();
@@ -308,18 +336,23 @@ void setup() {
 
     // Boot notification – yield to FreeRTOS scheduler while Telegram task starts
     vTaskDelay(pdMS_TO_TICKS(1500));
-    char bootMsg[280];
+    String timeStr = ntp_is_synchronized() ? ntp_get_formatted_time() : String("Syncing...");
+    String hostStr = preferences.getString("mdns_name", "esp32cam");
+    char bootMsg[320];
     snprintf(bootMsg, sizeof(bootMsg),
         "🚀 *ESP32-CAM Booted!*\n"
         "🌐 IP: `%s`\n"
-        "🌐 URL: http://esp32cam.local\n"
+        "🌐 URL: http://%s.local\n"
         "🧠 Heap: %dKB | PSRAM: %dKB\n"
         "📷 Camera: OV2640\n"
-        "💾 SD: %s",
+        "💾 SD: %s\n"
+        "⏱️ Time: %s",
         WiFi.localIP().toString().c_str(),
+        hostStr.c_str(),
         esp_get_free_heap_size() / 1024,
         heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024,
-        sd_is_mounted() ? "Mounted ✅" : "Not found ❌"
+        sd_is_mounted() ? "Mounted ✅" : "Not found ❌",
+        timeStr.c_str()
     );
     telegram_send_message(bootMsg);
 }

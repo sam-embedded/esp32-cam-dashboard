@@ -21,32 +21,19 @@
 #include "lwip/tcpip.h"
 #include "lwip/netdb.h"
 
-// ─── Custom WiFiClientSecure with safe DNS resolution ──────────
+// ─── Custom WiFiClientSecure with safe DNS resolution & MFLN ──
 class TelegramClient : public WiFiClientSecure {
 public:
     TelegramClient() {
         setInsecure();
-        setTimeout(10);
-        setHandshakeTimeout(10);
+        setTimeout(5);
+        setHandshakeTimeout(5);
     }
 
     int connect(const char* host, uint16_t port) override {
         setInsecure();
 
-        // 1. Try direct Telegram core IPv4 endpoints (no DNS needed, no lock needed)
-        static const IPAddress TG_IPV4[] = {
-            IPAddress(149, 154, 167, 220),
-            IPAddress(149, 154, 166, 110),
-            IPAddress(91, 108, 56, 170)
-        };
-
-        for (const auto& tip : TG_IPV4) {
-            // mbedTLS handles its own thread safety – no TCPIP core lock needed here
-            int ret = WiFiClientSecure::connect(tip, port, host, nullptr, nullptr, nullptr);
-            if (ret > 0) return ret;
-        }
-
-        // 2. DNS resolution – ONLY this call needs the TCPIP lock
+        // 1. Primary: Standard DNS resolution (fast, routes to closest Telegram DC)
         IPAddress resolvedIP;
         {
             LOCK_TCPIP_CORE();
@@ -58,9 +45,23 @@ public:
         }
 
         if (resolvedIP) {
-            // TLS connect without holding TCPIP lock
-            return WiFiClientSecure::connect(resolvedIP, port, host, nullptr, nullptr, nullptr);
+            int ret = WiFiClientSecure::connect(resolvedIP, port, host, nullptr, nullptr, nullptr);
+            if (ret > 0) return ret;
         }
+
+        // 2. Fallback: Direct Telegram core IPv4 endpoints if DNS is down/blocked
+        static const IPAddress TG_IPV4[] = {
+            IPAddress(149, 154, 167, 220),
+            IPAddress(149, 154, 166, 110),
+            IPAddress(91, 108, 56, 170)
+        };
+
+        for (const auto& tip : TG_IPV4) {
+            if (tip == resolvedIP) continue; // skip if already attempted above
+            int ret = WiFiClientSecure::connect(tip, port, host, nullptr, nullptr, nullptr);
+            if (ret > 0) return ret;
+        }
+
         return 0;
     }
 
@@ -189,6 +190,10 @@ void telegram_send_message(const char* text) {
     job.type = TG_JOB_TEXT;
     job.capturePhoto = false;
     snprintf(job.text, sizeof(job.text), "%s", text);
+    if (uxQueueSpacesAvailable(g_tg_queue) == 0) {
+        TgJob drop;
+        xQueueReceive(g_tg_queue, &drop, 0); // Drop oldest to keep queue fresh
+    }
     xQueueSend(g_tg_queue, &job, 0);
 }
 
@@ -202,6 +207,10 @@ void telegram_send_photo(const char* caption) {
         snprintf(job.text, sizeof(job.text), "%s", caption);
     } else {
         job.text[0] = '\0';
+    }
+    if (uxQueueSpacesAvailable(g_tg_queue) == 0) {
+        TgJob drop;
+        xQueueReceive(g_tg_queue, &drop, 0);
     }
     xQueueSend(g_tg_queue, &job, 0);
 }
@@ -238,7 +247,8 @@ static void handleNewMessages(int numNewMessages) {
             if (xSemaphoreTake(camera_mutex, pdMS_TO_TICKS(3000)) == pdTRUE) {
                 fb = esp_camera_fb_get();
                 if (fb) {
-                    jpg_buf = (uint8_t*)malloc(fb->len);
+                    jpg_buf = (uint8_t*)ps_malloc(fb->len);
+                    if (!jpg_buf) jpg_buf = (uint8_t*)malloc(fb->len);
                     if (jpg_buf) {
                         jpg_len = fb->len;
                         memcpy(jpg_buf, fb->buf, jpg_len);
@@ -322,10 +332,11 @@ void TaskTelegram(void* pvParameters) {
     parseChatIds(chats);
 
     g_bot = new UniversalTelegramBot(tg_token, g_tg_client);
-    g_bot->waitForResponse = 1500;
+    g_bot->waitForResponse = 3500; // 3.5s timeout for mobile hotspots
 
     g_tg_ready = true;
     uint32_t pollTick = 0;
+    uint32_t pollInterval = 2000;
 
     for (;;) {
         bool did_job = false;
@@ -342,10 +353,11 @@ void TaskTelegram(void* pvParameters) {
                 size_t   jpg_len = 0;
                 camera_fb_t* fb  = nullptr;
 
-                if (xSemaphoreTake(camera_mutex, pdMS_TO_TICKS(2000)) == pdTRUE) {
+                if (xSemaphoreTake(camera_mutex, pdMS_TO_TICKS(2500)) == pdTRUE) {
                     fb = esp_camera_fb_get();
                     if (fb) {
-                        jpg_buf = (uint8_t*)malloc(fb->len);
+                        jpg_buf = (uint8_t*)ps_malloc(fb->len);
+                        if (!jpg_buf) jpg_buf = (uint8_t*)malloc(fb->len);
                         if (jpg_buf) {
                             jpg_len = fb->len;
                             memcpy(jpg_buf, fb->buf, jpg_len);
@@ -373,14 +385,22 @@ void TaskTelegram(void* pvParameters) {
             }
         }
 
-        // ── 2. Poll incoming Telegram commands ──
-        if (millis() - pollTick > 2000 || did_job) {
+        // ── 2. Poll incoming Telegram commands with adaptive backoff ──
+        if (millis() - pollTick > pollInterval || did_job) {
             pollTick = millis();
             if (WiFi.status() == WL_CONNECTED && !tg_token.isEmpty()) {
                 int numNew = g_bot->getUpdates(g_bot->last_message_received + 1);
-                while (numNew) {
-                    handleNewMessages(numNew);
-                    numNew = g_bot->getUpdates(g_bot->last_message_received + 1);
+                if (numNew > 0) {
+                    pollInterval = 2000;
+                    while (numNew) {
+                        handleNewMessages(numNew);
+                        numNew = g_bot->getUpdates(g_bot->last_message_received + 1);
+                    }
+                } else if (numNew < 0) {
+                    // Back off to 6s on network error to prevent hammering
+                    pollInterval = 6000;
+                } else {
+                    pollInterval = 2000;
                 }
             }
         }

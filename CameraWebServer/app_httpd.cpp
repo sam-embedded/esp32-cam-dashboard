@@ -80,13 +80,14 @@ static esp_err_t stream_handler(httpd_req_t* req) {
     while (true) {
         camera_fb_t* fb = nullptr;
 
-        if (xSemaphoreTake(camera_mutex, pdMS_TO_TICKS(200)) == pdTRUE) {
+        if (xSemaphoreTake(camera_mutex, pdMS_TO_TICKS(150)) == pdTRUE) {
             fb = esp_camera_fb_get();
             xSemaphoreGive(camera_mutex);
         }
 
-        if (!fb) {
-            vTaskDelay(pdMS_TO_TICKS(10));
+        if (!fb || fb->len == 0) {
+            if (fb) esp_camera_fb_return(fb);
+            vTaskDelay(pdMS_TO_TICKS(15));
             continue;
         }
 
@@ -109,8 +110,10 @@ static esp_err_t stream_handler(httpd_req_t* req) {
         vTaskDelay(pdMS_TO_TICKS(delay_ms));
     }
 
-    httpd_resp_send_chunk(req, nullptr, 0);
-    return ESP_OK;
+    if (res == ESP_OK) {
+        httpd_resp_send_chunk(req, nullptr, 0);
+    }
+    return res;
 }
 
 // ─── Dashboard HTML ───────────────────────────────────────────
@@ -698,18 +701,28 @@ static esp_err_t telegram_test_https_handler(httpd_req_t* req) {
 void startCameraServer() {
     g_stream_fps = preferences.getInt("cam_fps", 25);
 
+    // Stop previous instances if running (safe re-init)
+    if (stream_httpd) {
+        httpd_stop(stream_httpd);
+        stream_httpd = nullptr;
+    }
+    if (camera_httpd) {
+        httpd_stop(camera_httpd);
+        camera_httpd = nullptr;
+    }
+
     // ── Port 81: MJPEG stream server (dedicated, never blocks port 80) ──
-    httpd_config_t scfg  = HTTPD_DEFAULT_CONFIG();
-    scfg.server_port     = 81;
-    scfg.ctrl_port       = 32768;   // unique ctrl socket port
+    httpd_config_t scfg   = HTTPD_DEFAULT_CONFIG();
+    scfg.server_port      = 81;
+    scfg.ctrl_port        = 32768;   // unique ctrl socket port
     scfg.max_uri_handlers = 2;
-    scfg.max_open_sockets = 3;
-    scfg.stack_size      = 8192;
-    scfg.task_priority   = 5;
-    scfg.core_id         = 1;
-    scfg.recv_wait_timeout = 5;
-    scfg.send_wait_timeout = 5;
-    scfg.lru_purge_enable = true;
+    scfg.max_open_sockets = 2;       // Dedicated 2 stream viewers to protect DRAM & bus
+    scfg.stack_size       = 8192;
+    scfg.task_priority    = 5;
+    scfg.core_id          = 1;
+    scfg.recv_wait_timeout = 4;
+    scfg.send_wait_timeout = 4;
+    scfg.lru_purge_enable  = true;
     if (httpd_start(&stream_httpd, &scfg) == ESP_OK) {
         httpd_uri_t su = { "/stream", HTTP_GET, stream_handler, nullptr };
         httpd_register_uri_handler(stream_httpd, &su);
@@ -723,12 +736,12 @@ void startCameraServer() {
     config.server_port       = 80;
     config.ctrl_port         = 32769;   // different ctrl socket port
     config.max_uri_handlers  = 24;
-    config.max_open_sockets  = 7;
+    config.max_open_sockets  = 4;       // 4 sockets saves ~15KB internal DRAM
     config.stack_size        = 8192;
     config.task_priority     = 4;
     config.core_id           = 1;
-    config.recv_wait_timeout = 30;
-    config.send_wait_timeout = 30;
+    config.recv_wait_timeout = 5;       // Fast recycling of closed/stalled connections
+    config.send_wait_timeout = 5;       // Fast timeout if client tab is closed
     config.lru_purge_enable  = true;
 
     auto reg = [&](const char* uri, httpd_method_t method, esp_err_t (*handler)(httpd_req_t*)) {
