@@ -29,11 +29,11 @@ bool ntp_sync_time(long gmtOffsetSec, int dstOffsetSec) {
     // Set immediate sync mode so time applies right away
     esp_sntp_set_sync_mode(SNTP_SYNC_MODE_IMMED);
 
-    // Multi-server anycast configuration (Google, Cloudflare, Global Pool)
+    // Multi-server anycast configuration (Google, Cloudflare, direct anycast IP safeguard)
     configTime(gmtOffsetSec, dstOffsetSec,
                "time.google.com",
                "time.cloudflare.com",
-               "pool.ntp.org");
+               "216.239.35.0");  // Anycast IP for time.google.com (works without DNS!)
 
     // Quick initial check (up to 1.5s) in case network is immediately responsive
     uint32_t t0 = millis();

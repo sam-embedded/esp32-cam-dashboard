@@ -33,23 +33,20 @@ public:
     int connect(const char* host, uint16_t port) override {
         setInsecure();
 
-        // 1. Primary: Standard DNS resolution (fast, routes to closest Telegram DC)
+        // 1. Primary: Standard Arduino WiFi DNS resolution (non-blocking, uses overridden DNS 8.8.8.8)
         IPAddress resolvedIP;
-        {
-            LOCK_TCPIP_CORE();
-            struct hostent* he = gethostbyname(host);
-            if (he && he->h_addr_list && he->h_addr_list[0]) {
-                resolvedIP = IPAddress((const uint8_t*)he->h_addr_list[0]);
-            }
-            UNLOCK_TCPIP_CORE();
-        }
-
-        if (resolvedIP) {
+        if (WiFi.hostByName(host, resolvedIP) && resolvedIP != IPAddress(0, 0, 0, 0)) {
             int ret = WiFiClientSecure::connect(resolvedIP, port, host, nullptr, nullptr, nullptr);
             if (ret > 0) return ret;
         }
 
-        // 2. Fallback: Direct Telegram core IPv4 endpoints if DNS is down/blocked
+        // 2. Fallback: Direct hostname connect via mbedTLS
+        {
+            int ret = WiFiClientSecure::connect(host, port);
+            if (ret > 0) return ret;
+        }
+
+        // 3. Fallback: Direct Telegram core IPv4 endpoints if DNS is down/blocked
         static const IPAddress TG_IPV4[] = {
             IPAddress(149, 154, 167, 220),
             IPAddress(149, 154, 166, 110),

@@ -234,7 +234,11 @@ static esp_err_t telemetry_handler(httpd_req_t* req) {
     sensor_t* s = esp_camera_sensor_get();
     int fs = s ? s->status.framesize : 6;
 
-    char json[512];
+    // Check if recording is active (sd mounted + recording task running)
+    extern volatile bool g_recording_active;  // defined in sd_manager.cpp
+    bool recording = sd_is_mounted() && g_recording_active;
+
+    char json[640];
     snprintf(json, sizeof(json),
         "{"
         "\"rssi\":%d,"
@@ -247,6 +251,7 @@ static esp_err_t telemetry_handler(httpd_req_t* req) {
         "\"framesize\":%d,"
         "\"fps\":%d,"
         "\"flash\":%d,"
+        "\"recording\":%s,"
         "\"time\":\"%s\""
         "}",
         WiFi.RSSI(),
@@ -259,6 +264,7 @@ static esp_err_t telemetry_handler(httpd_req_t* req) {
         fs,
         g_stream_fps,
         digitalRead(g_flash_pin),
+        recording ? "true" : "false",
         ntp_get_formatted_time().c_str()
     );
     httpd_resp_set_type(req, "application/json");

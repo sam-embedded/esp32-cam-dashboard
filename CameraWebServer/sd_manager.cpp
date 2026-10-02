@@ -162,6 +162,9 @@ struct AviIndexEntry {
     uint32_t size;
 };
 
+// Global flag: true while a recording session is in progress (for telemetry UI)
+volatile bool g_recording_active = false;
+
 void TaskRecording(void* pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(5000));  // let camera and wifi settle
 
@@ -207,6 +210,7 @@ void TaskRecording(void* pvParameters) {
         }
 
         Serial.printf("[REC] Recording started: %s (%u min @ %u fps)\n", path.c_str(), interval_min, fps);
+        g_recording_active = true;  // Signal to UI that recording is in progress
 
         // Get initial camera resolution
         sensor_t* s = esp_camera_sensor_get();
@@ -395,6 +399,7 @@ void TaskRecording(void* pvParameters) {
                 xSemaphoreGive(g_sd_mutex);
             }
         }
+        g_recording_active = false;  // Session complete
     }
 }
 

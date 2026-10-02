@@ -416,15 +416,18 @@ const char index_html[] PROGMEM = R"rawliteral(
       <div class="status-group">
         <div class="status-badge" style="color:#38bdf8;">
           <span class="live-dot" id="bar-live-dot"></span>
-          <span id="bar-status">Streaming</span>
+          <span id="bar-status">Connecting...</span>
         </div>
         <div class="status-badge" id="bar-fps">⚡ 25 FPS</div>
-        <div class="status-badge" id="bar-rssi">📶 WiFi: -- dBm</div>
+        <div class="status-badge" id="bar-rssi">📶 -- dBm</div>
+        <div class="status-badge" id="bar-sd" style="color:#10b981;">💾 SD --</div>
+        <div class="status-badge" id="bar-rec" style="display:none;color:#ef4444;">🔴 REC</div>
       </div>
       <div class="status-group">
         <div class="status-badge" id="bar-time" style="color:#38bdf8;">🕒 --</div>
-        <div class="status-badge" id="bar-uptime" style="color:#10b981;">⏱ Uptime: 0s</div>
-        <div class="status-badge" id="bar-ip" style="color:var(--text-muted);">🌐 192.168.31.113</div>
+        <div class="status-badge" id="bar-heap" style="color:var(--text-muted);">🧠 --</div>
+        <div class="status-badge" id="bar-uptime" style="color:#10b981;">⏱ 0s</div>
+        <div class="status-badge" id="bar-ip" style="color:var(--text-muted);">🌐 --</div>
       </div>
     </div>
   </div>
@@ -752,14 +755,104 @@ const char index_html[] PROGMEM = R"rawliteral(
       return `${s}s`;
     }
 
-    // Init Stream
+    // ─── Stream auto-start + auto-reconnect ────────────────────
+    let streamRetryTimer = null;
+    function startStream() {
+      const img = document.getElementById('stream-img');
+      const host = location.hostname;
+      img.src = `${location.protocol}//${host}:81/stream?t=${Date.now()}`;
+      document.getElementById('stream-status').innerText = 'LIVE STREAM';
+    }
+
+    function onStreamError() {
+      document.getElementById('live-indicator').classList.remove('active');
+      document.getElementById('bar-live-dot').classList.remove('active');
+      document.getElementById('stream-status').innerText = 'Reconnecting...';
+      document.getElementById('bar-status').innerText = 'Reconnecting...';
+      // Clear src to stop showing broken image, retry in 3s
+      document.getElementById('stream-img').src = '';
+      if (streamRetryTimer) clearTimeout(streamRetryTimer);
+      streamRetryTimer = setTimeout(() => {
+        startStream();
+      }, 3000);
+    }
+
+    function onStreamLoad() {
+      document.getElementById('live-indicator').classList.add('active');
+      document.getElementById('bar-live-dot').classList.add('active');
+      document.getElementById('bar-status').innerText = 'Streaming';
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
-      const port = (location.port === '' || location.port === '80') ? ':81' : ':81';
-      document.getElementById('stream-img').src = `${location.protocol}//${location.hostname}${port}/stream`;
+      const img = document.getElementById('stream-img');
+      img.onerror = onStreamError;
+      img.onload  = onStreamLoad;
+      startStream();
       pollTelemetry();
       setInterval(pollTelemetry, 2000);
       loadSystemSettings();
     });
+
+    function pollTelemetry() {
+      fetch('/api/telemetry')
+        .then(r => r.json())
+        .then(d => {
+          document.getElementById('live-indicator').classList.add('active');
+          document.getElementById('bar-live-dot').classList.add('active');
+          document.getElementById('bar-status').innerText = 'Streaming';
+
+          // RSSI
+          const rssiText = `📶 ${d.rssi} dBm`;
+          document.getElementById('overlay-rssi').innerText = rssiText;
+          document.getElementById('bar-rssi').innerText = rssiText;
+
+          // Uptime
+          const uptimeStr = formatUptime(d.uptime);
+          document.getElementById('bar-uptime').innerText = `⏱ ${uptimeStr}`;
+
+          // IP
+          document.getElementById('bar-ip').innerText = `🌐 ${d.ip}`;
+
+          // Time
+          if (d.time && d.time !== '--') {
+            document.getElementById('bar-time').innerText = `🕒 ${d.time}`;
+          }
+
+          // FPS
+          if (d.fps) {
+            document.getElementById('overlay-fps').innerText = `${d.fps} FPS`;
+            document.getElementById('bar-fps').innerText = `⚡ ${d.fps} FPS`;
+          }
+
+          // Heap & PSRAM
+          if (d.heap !== undefined) {
+            const heapKB  = Math.round(d.heap / 1024);
+            const psramKB = Math.round(d.psram / 1024);
+            document.getElementById('bar-heap').innerText = `🧠 ${heapKB}KB / ${psramKB}KB`;
+            // Warn low heap
+            document.getElementById('bar-heap').style.color =
+              heapKB < 30 ? 'var(--danger)' : 'var(--text-muted)';
+          }
+
+          // SD Card status
+          if (d.sd_mounted !== undefined) {
+            const sdEl = document.getElementById('bar-sd');
+            sdEl.innerText = d.sd_mounted ? '💾 SD ✅' : '💾 SD ❌';
+            sdEl.style.color = d.sd_mounted ? '#10b981' : '#ef4444';
+          }
+
+          // Recording indicator (if sd_mounted & recording field present)
+          if (d.recording !== undefined) {
+            const recEl = document.getElementById('bar-rec');
+            recEl.style.display = d.recording ? 'inline-flex' : 'none';
+          }
+        })
+        .catch(() => {
+          document.getElementById('live-indicator').classList.remove('active');
+          document.getElementById('bar-live-dot').classList.remove('active');
+          document.getElementById('bar-status').innerText = 'Reconnecting...';
+        });
+    }
 
     function showToast(msg) {
       const c = document.getElementById('toast-container');
@@ -838,7 +931,6 @@ const char index_html[] PROGMEM = R"rawliteral(
       const diag = document.getElementById('tg-diag-box');
       diag.style.display = 'block';
       diag.innerText = 'Connecting to api.telegram.org:443 via TLS...\nTesting handshake latency & certificate validation...';
-
       fetch('/api/telegram/test_https')
         .then(r => r.json())
         .then(d => {
@@ -856,7 +948,7 @@ const char index_html[] PROGMEM = R"rawliteral(
             showToast(`❌ TLS Handshake Failed: ${d.err}`);
           }
         })
-        .catch(err => {
+        .catch(() => {
           diag.style.color = '#ef4444';
           diag.innerText = '❌ Network request error while running TLS diagnostic';
           showToast('❌ Network error testing HTTPS');
@@ -870,37 +962,6 @@ const char index_html[] PROGMEM = R"rawliteral(
         .then(d => {
           if (d.ok) showToast(`✅ Telegram test ${type} queued!`);
           else showToast(`❌ Telegram test failed`);
-        });
-    }
-
-    function pollTelemetry() {
-      fetch('/api/telemetry')
-        .then(r => r.json())
-        .then(d => {
-          document.getElementById('live-indicator').classList.add('active');
-          document.getElementById('bar-live-dot').classList.add('active');
-          
-          // WiFi RSSI & Uptime
-          const rssiText = `📶 ${d.rssi} dBm`;
-          const uptimeStr = formatUptime(d.uptime);
-          
-          document.getElementById('overlay-rssi').innerText = rssiText;
-          document.getElementById('bar-rssi').innerText = `📶 WiFi: ${d.rssi} dBm`;
-          document.getElementById('bar-uptime').innerText = `⏱ Uptime: ${uptimeStr}`;
-          document.getElementById('bar-ip').innerText = `🌐 ${d.ip}`;
-          if (d.time) {
-            document.getElementById('bar-time').innerText = `🕒 ${d.time}`;
-          }
-          
-          if (d.fps) {
-            document.getElementById('overlay-fps').innerText = `${d.fps} FPS`;
-            document.getElementById('bar-fps').innerText = `⚡ ${d.fps} FPS`;
-          }
-        })
-        .catch(() => {
-          document.getElementById('live-indicator').classList.remove('active');
-          document.getElementById('bar-live-dot').classList.remove('active');
-          document.getElementById('bar-status').innerText = 'Reconnecting...';
         });
     }
 

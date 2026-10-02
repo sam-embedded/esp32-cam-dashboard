@@ -124,17 +124,33 @@ static void initMDNS() {
 static volatile bool g_send_wifi_connect_notify = false;
 static bool          g_is_initial_boot_notify   = true;
 
-// ─── WiFi event handler (strictly non-blocking) ───────────────
-static void wifiEventHandler(WiFiEvent_t event) {
+// Flags set by event handler, printed safely in task context
+static volatile bool    g_evt_got_ip        = false;
+static volatile bool    g_evt_disconnect    = false;
+static volatile uint8_t g_disconnect_reason = 0;
+
+// ─── WiFi event handler (strictly non-blocking — no Serial/NVS/mDNS) ─
+static void wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info) {
     switch (event) {
-        case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+        case ARDUINO_EVENT_WIFI_STA_GOT_IP: {
+            // Immediately override router DNS with 8.8.8.8 and 1.1.1.1 in lwIP
+            ip_addr_t d1, d2;
+            ipaddr_aton("8.8.8.8", &d1);
+            ipaddr_aton("1.1.1.1", &d2);
+            dns_setserver(0, &d1);
+            dns_setserver(1, &d2);
+
             g_wifi_connected = true;
             g_ap_fallback    = false;
             g_send_wifi_connect_notify = true;
+            g_evt_got_ip     = true;
             break;
+        }
 
         case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
-            g_wifi_connected = false;
+            g_wifi_connected    = false;
+            g_disconnect_reason = info.wifi_sta_disconnected.reason;
+            g_evt_disconnect    = true;
             break;
 
         default: break;
@@ -147,9 +163,19 @@ static void TaskWiFiWatchdog(void* pvParameters) {
     uint32_t attempts = 0;
 
     for (;;) {
-        vTaskDelay(pdMS_TO_TICKS(3000));
+        vTaskDelay(pdMS_TO_TICKS(2000));  // Check every 2s for faster detection
 
-        // If WiFi is connected, reset watchdog and sleep
+        // Print any pending WiFi event log lines safely from this task context
+        if (g_evt_got_ip) {
+            g_evt_got_ip = false;
+            Serial.printf("[WiFi] Connected! IP: %s\n", WiFi.localIP().toString().c_str());
+        }
+        if (g_evt_disconnect) {
+            g_evt_disconnect = false;
+            Serial.printf("[WiFi] Disconnected (reason %u) — watchdog monitoring...\n", g_disconnect_reason);
+        }
+
+        // If WiFi is connected, reset watchdog state and continue
         if (WiFi.status() == WL_CONNECTED) {
             disconnected_since = 0;
             attempts = 0;
@@ -159,7 +185,7 @@ static void TaskWiFiWatchdog(void* pvParameters) {
 
         g_wifi_connected = false;
 
-        // Mark the time disconnection started
+        // Mark the time disconnection was first noticed
         if (disconnected_since == 0) {
             disconnected_since = millis();
             continue;
@@ -176,22 +202,29 @@ static void TaskWiFiWatchdog(void* pvParameters) {
 
         String ssid = preferences.getString("wifi_ssid", "FTTH");
         String pass = preferences.getString("wifi_pass", "Selva@home");
+        ssid.trim();
+        pass.trim();
+        if (ssid.isEmpty()) ssid = "FTTH";
+        if (pass.isEmpty()) pass = "Selva@home";
 
         WiFi.disconnect();
-        vTaskDelay(pdMS_TO_TICKS(500));
+        vTaskDelay(pdMS_TO_TICKS(300));
         WiFi.begin(ssid.c_str(), pass.c_str());
 
-        // Wait up to 10s for reconnect
+        // Wait up to 12s for reconnect
         uint32_t wait_start = millis();
-        while (WiFi.status() != WL_CONNECTED && millis() - wait_start < 10000) {
+        while (WiFi.status() != WL_CONNECTED && millis() - wait_start < 12000) {
             vTaskDelay(pdMS_TO_TICKS(500));
         }
 
         if (WiFi.status() == WL_CONNECTED) {
-            Serial.printf("[WiFi] Reconnected successfully! IP: %s\n", WiFi.localIP().toString().c_str());
+            Serial.printf("[WiFi] Watchdog reconnected! IP: %s\n", WiFi.localIP().toString().c_str());
             disconnected_since = 0;
             attempts = 0;
             g_wifi_connected = true;
+            // Trigger reconnect Telegram notification (NOT a boot notify)
+            g_is_initial_boot_notify   = false;
+            g_send_wifi_connect_notify = true;
             continue;
         }
 
@@ -201,6 +234,7 @@ static void TaskWiFiWatchdog(void* pvParameters) {
             WiFi.mode(WIFI_AP);
             WiFi.softAP("ESP32-CAM-AP", "esp32cam1234");
             g_ap_fallback = true;
+            telegram_send_message("⚠️ WiFi failed after 5 retries\\nFallback AP: ESP32-CAM-AP\\nPassword: esp32cam1234");
             // Stay in AP mode for 3 minutes before retrying STA
             vTaskDelay(pdMS_TO_TICKS(180000));
             attempts = 0;
@@ -212,6 +246,8 @@ static void TaskWiFiWatchdog(void* pvParameters) {
 }
 
 // ─── Telemetry task ───────────────────────────────────────────
+extern volatile bool g_tg_ready;  // defined in telegram_worker.cpp
+
 static void TaskTelemetry(void* pvParameters) {
     uint32_t heartbeat = millis();
     uint32_t memCheck  = millis();
@@ -255,7 +291,8 @@ static void TaskTelemetry(void* pvParameters) {
         }
 
         // Automatic rich notification whenever WiFi connects or reconnects with IP
-        if (g_send_wifi_connect_notify && WiFi.status() == WL_CONNECTED) {
+        // Wait until the Telegram task is ready before attempting to send
+        if (g_send_wifi_connect_notify && WiFi.status() == WL_CONNECTED && g_tg_ready) {
             g_send_wifi_connect_notify = false;
 
             // Force robust public DNS servers (bypasses dead or misconfigured router DNS)
@@ -265,14 +302,15 @@ static void TaskTelemetry(void* pvParameters) {
                 ipaddr_aton("1.1.1.1", &d2);
                 dns_setserver(0, &d1);
                 dns_setserver(1, &d2);
+                Serial.println("[DNS] Overrode router DNS → 8.8.8.8 / 1.1.1.1");
             }
 
-            // Safe mDNS registration in task context
+            // Safe mDNS registration in task context (DNS must be set first)
             initMDNS();
 
-            // Allow SNTP up to 1.5s to acquire time if just connecting
+            // Allow SNTP up to 3s to acquire time if just connecting
             uint32_t t_sync = millis();
-            while (!ntp_is_synchronized() && millis() - t_sync < 1500) {
+            while (!ntp_is_synchronized() && millis() - t_sync < 3000) {
                 vTaskDelay(pdMS_TO_TICKS(100));
             }
 
@@ -348,35 +386,53 @@ void setup() {
         esp_restart();
     }
 
+    // Pre-configure DNS override so lwIP has 8.8.8.8 and 1.1.1.1 immediately
+    {
+        ip_addr_t d1, d2;
+        ipaddr_aton("8.8.8.8", &d1);
+        ipaddr_aton("1.1.1.1", &d2);
+        dns_setserver(0, &d1);
+        dns_setserver(1, &d2);
+    }
+
     // WiFi
+    WiFi.persistent(false);
     WiFi.onEvent(wifiEventHandler);
     WiFi.mode(WIFI_STA);
-    WiFi.disconnect(true);
-    delay(100);
-    WiFi.setSleep(false);
-    WiFi.setTxPower(WIFI_POWER_19_5dBm);
+    WiFi.setAutoReconnect(true);
+
     String ssid = preferences.getString("wifi_ssid", "FTTH");
     String pass = preferences.getString("wifi_pass", "Selva@home");
+    ssid.trim();
+    pass.trim();
     if (ssid.isEmpty()) ssid = "FTTH";
     if (pass.isEmpty()) pass = "Selva@home";
+
     WiFi.setHostname("esp32cam");
-    WiFi.setAutoReconnect(true);
-    WiFi.begin(ssid.c_str(), pass.c_str());
+    Serial.printf("[WiFi] Target SSID: '%s', Pass length: %d\n", ssid.c_str(), (int)pass.length());
     Serial.printf("[WiFi] Connecting to %s", ssid.c_str());
+
+    WiFi.begin(ssid.c_str(), pass.c_str());
+
     uint32_t t0 = millis();
-    while (WiFi.status() != WL_CONNECTED && millis() - t0 < 25000) {
-        delay(500); Serial.print('.');
+    while (WiFi.status() != WL_CONNECTED && millis() - t0 < 20000) {
+        delay(500); 
+        Serial.print('.');
+        if (g_evt_disconnect) {
+            g_evt_disconnect = false;
+            Serial.printf("[reason:%u]", g_disconnect_reason);
+        }
     }
     Serial.println();
     if (WiFi.status() == WL_CONNECTED) {
         WiFi.setSleep(false);
         Serial.printf("[WiFi] Connected! IP: %s\n", WiFi.localIP().toString().c_str());
     } else {
-        Serial.println("[WiFi] Initial connect timed out – watchdog will retry");
+        Serial.println("[WiFi] Initial connect pending – watchdog will retry");
     }
 
-    // mDNS service registration
-    initMDNS();
+    // mDNS will be (re-)registered by TaskTelemetry after DNS override on first GOT_IP
+    // initMDNS() here is premature — DNS not yet set to 8.8.8.8, skipping.
 
     // Time sync (Background SNTP daemon with immediate check)
     long gmtOffset = preferences.getLong("ntp_offset", 19800); // 19800 = +5:30 (IST)
@@ -398,8 +454,8 @@ void setup() {
     telegram_init();
 
     // FreeRTOS tasks
-    xTaskCreatePinnedToCore(TaskWiFiWatchdog, "TaskWiFiWD",  4096, nullptr, 3, nullptr, 0);
-    xTaskCreatePinnedToCore(TaskTelemetry,    "TaskTelemetry", 4096, nullptr, 1, nullptr, 0);
+    xTaskCreatePinnedToCore(TaskWiFiWatchdog, "TaskWiFiWD",    4096, nullptr, 3, nullptr, 0);
+    xTaskCreatePinnedToCore(TaskTelemetry,    "TaskTelemetry", 8192, nullptr, 1, nullptr, 0);  // 8KB: DNS+mDNS+NTP+Telegram
     recording_init();  // TaskRecording on Core 0, priority 1
 
     Serial.println("[BOOT] All tasks started");
