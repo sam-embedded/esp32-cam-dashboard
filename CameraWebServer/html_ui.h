@@ -30,8 +30,7 @@ const char index_html[] PROGMEM = R"rawliteral(
       --jqm-danger: #ef4444;
       --jqm-warning: #f59e0b;
       --radius: 10px;
-      --nav-height: 60px;
-      --header-height: 52px;
+      --header-height: 50px;
     }
 
     * {
@@ -52,7 +51,7 @@ const char index_html[] PROGMEM = R"rawliteral(
       overflow-x: hidden;
     }
 
-    /* ─── jQuery Mobile Header ─── */
+    /* ─── jQuery Mobile Top App Header ─── */
     .ui-header {
       background: var(--jqm-bar-bg);
       border-bottom: 1px solid var(--jqm-bar-border);
@@ -60,11 +59,11 @@ const char index_html[] PROGMEM = R"rawliteral(
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 0.75rem;
+      padding: 0 0.85rem;
       position: sticky;
       top: 0;
       z-index: 100;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
     }
     .ui-title {
       font-size: 1.05rem;
@@ -131,71 +130,13 @@ const char index_html[] PROGMEM = R"rawliteral(
     }
     .ui-btn-block { width: 100%; }
 
-    /* ─── Persistent Bottom Navbar (jQuery Mobile Style) ─── */
-    .ui-navbar {
-      background: var(--jqm-bar-bg);
-      border-top: 1px solid var(--jqm-bar-border);
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px));
-      padding-bottom: env(safe-area-inset-bottom, 0px);
-      z-index: 100;
-      display: flex;
-      box-shadow: 0 -2px 10px rgba(0,0,0,0.5);
-    }
-    .ui-nav-item {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 3px;
-      background: transparent;
-      border: none;
-      border-right: 1px solid rgba(255,255,255,0.05);
-      color: var(--jqm-text-muted);
-      cursor: pointer;
-      padding: 0.35rem 0;
-      transition: all 0.15s ease;
-      touch-action: manipulation;
-    }
-    .ui-nav-item:last-child { border-right: none; }
-    .ui-nav-item .nav-icon { font-size: 1.25rem; transition: transform 0.15s; }
-    .ui-nav-item .nav-label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
-    .ui-nav-item.ui-btn-active {
-      color: #38bdf8;
-      background: rgba(2, 132, 199, 0.18);
-      box-shadow: inset 0 3px 0 #38bdf8;
-    }
-    .ui-nav-item.ui-btn-active .nav-icon { transform: scale(1.1); }
-
-    /* ─── Main Content Layout ─── */
-    .ui-content {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 0.5rem);
-    }
-
-    /* Tab Panes */
-    .tab-pane {
-      display: none;
-      flex-direction: column;
-      flex: 1;
-      animation: fadeIn 0.2s ease-out;
-    }
-    .tab-pane.active { display: flex; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-
-    /* ─── Stream Pane (Live View) ─── */
+    /* ─── Stream & Video Viewport ─── */
     .viewport-box {
       position: relative;
       width: 100%;
       background: #000;
-      min-height: 240px;
-      max-height: 70vh;
+      min-height: 220px;
+      max-height: 60vh;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -209,7 +150,7 @@ const char index_html[] PROGMEM = R"rawliteral(
       display: block;
     }
 
-    /* HUD Overlay */
+    /* HUD Overlay on Video */
     .hud-overlay {
       position: absolute;
       top: 10px;
@@ -240,7 +181,7 @@ const char index_html[] PROGMEM = R"rawliteral(
       box-shadow: 0 0 8px var(--jqm-success);
     }
 
-    /* Stream Quick Action Toolbar */
+    /* ─── Stream Quick Action Toolbar (Below Video) ─── */
     .stream-toolbar {
       display: flex;
       align-items: center;
@@ -257,17 +198,17 @@ const char index_html[] PROGMEM = R"rawliteral(
       gap: 0.45rem;
     }
 
-    /* Telemetry Pill Grid */
+    /* ─── Stream FPS & Hardware Telemetry Strip ─── */
     .telemetry-strip {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.4rem;
-      padding: 0.65rem 0.85rem;
-      background: rgba(19, 29, 46, 0.6);
-      border-bottom: 1px solid var(--jqm-inset-border);
+      gap: 0.35rem;
+      padding: 0.55rem 0.85rem;
+      background: rgba(19, 29, 46, 0.75);
+      border-bottom: 1px solid var(--jqm-bar-border);
     }
     .stat-pill {
-      background: rgba(255,255,255,0.04);
+      background: rgba(255,255,255,0.05);
       border: 1px solid var(--jqm-inset-border);
       border-radius: 6px;
       padding: 0.25rem 0.55rem;
@@ -278,6 +219,55 @@ const char index_html[] PROGMEM = R"rawliteral(
       gap: 0.3rem;
       white-space: nowrap;
     }
+
+    /* ─── jQuery Mobile Sub-Navbar: Camera, SD Card, Telegram, Settings (Directly Below Stream & FPS Info) ─── */
+    .ui-subnav {
+      display: flex;
+      background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+      border-bottom: 2px solid var(--jqm-bar-border);
+      position: sticky;
+      top: var(--header-height);
+      z-index: 50;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    }
+    .ui-subnav-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      padding: 0.75rem 0.35rem;
+      background: transparent;
+      border: none;
+      border-right: 1px solid rgba(255,255,255,0.07);
+      color: var(--jqm-text-muted);
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      touch-action: manipulation;
+      text-shadow: 0 1px 1px rgba(0,0,0,0.5);
+    }
+    .ui-subnav-btn:last-child { border-right: none; }
+    .ui-subnav-btn:active { background: rgba(2, 132, 199, 0.12); }
+    .ui-subnav-btn.ui-btn-active {
+      color: #38bdf8;
+      background: rgba(2, 132, 199, 0.22);
+      box-shadow: inset 0 -3px 0 #38bdf8;
+    }
+    .ui-subnav-btn .subnav-icon { font-size: 1.1rem; }
+
+    /* ─── Control Panels Container (Rendered Bellow) ─── */
+    .sections-container {
+      flex: 1;
+      padding-bottom: 2rem;
+    }
+    .section-pane {
+      display: none;
+      animation: fadeIn 0.2s ease-out;
+    }
+    .section-pane.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
     /* ─── jQuery Mobile Inset Listview ─── */
     .ui-listview-inset {
@@ -596,7 +586,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     /* ─── Toast Notifications ─── */
     .toast-box {
       position: fixed;
-      bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 12px);
+      bottom: 24px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 999;
@@ -626,70 +616,41 @@ const char index_html[] PROGMEM = R"rawliteral(
       to { opacity: 1; transform: translateY(0); }
     }
 
-    /* ─── DESKTOP DASHBOARD OPTIMIZATION ─── */
-    @media (min-width: 900px) {
+    /* ─── DESKTOP DASHBOARD ENHANCEMENT (≥ 960px) ─── */
+    @media (min-width: 960px) {
       body {
         height: 100vh;
         overflow: hidden;
       }
-      .ui-navbar {
-        position: static;
-        height: var(--header-height);
-        padding-bottom: 0;
-        border-top: none;
-        border-bottom: 1px solid var(--jqm-bar-border);
-        box-shadow: none;
-        flex: 1;
-        max-width: 580px;
-      }
-      .ui-header {
-        justify-content: flex-start;
-        gap: 1.5rem;
-      }
-      .ui-header-right {
-        margin-left: auto;
-      }
-      .ui-content {
-        flex: 1;
+      .main-layout {
         display: grid;
         grid-template-columns: 1.25fr 1fr;
-        padding-bottom: 0;
-        overflow: hidden;
         height: calc(100vh - var(--header-height));
+        overflow: hidden;
       }
-      /* Left Column: Permanent Live Stream & HUD */
-      .desktop-stream-col {
-        display: flex !important;
+      .desktop-stream-pane {
+        display: flex;
         flex-direction: column;
         border-right: 1px solid var(--jqm-bar-border);
         background: #000;
         height: 100%;
-        overflow: hidden;
+        overflow-y: auto;
       }
       .viewport-box {
         flex: 1;
         max-height: unset;
-        min-height: unset;
+        min-height: 340px;
       }
-      /* Right Column: Tabbed Management Hub */
-      .desktop-hub-col {
+      .desktop-controls-pane {
         display: flex;
         flex-direction: column;
         height: 100%;
         overflow-y: auto;
         background: var(--jqm-page-bg);
       }
-      .desktop-hub-header {
-        padding: 0.75rem 1rem;
-        background: var(--jqm-bar-bg);
-        border-bottom: 1px solid var(--jqm-bar-border);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-      }
-      .tab-pane {
-        overflow-y: auto;
-        flex: 1;
+      .ui-subnav {
+        position: sticky;
+        top: 0;
       }
     }
   </style>
@@ -701,42 +662,19 @@ const char index_html[] PROGMEM = R"rawliteral(
     <div class="ui-title">
       <span>📷</span> ESP32-CAM Pro
     </div>
-
-    <!-- Desktop Tab Navigation seamlessly embedded in header -->
-    <nav class="ui-navbar" id="app-navbar">
-      <button class="ui-nav-item ui-btn-active" onclick="switchNavTab('tab-stream')" id="nav-btn-stream">
-        <span class="nav-icon">📹</span>
-        <span class="nav-label">Live</span>
-      </button>
-      <button class="ui-nav-item" onclick="switchNavTab('tab-cam')" id="nav-btn-cam">
-        <span class="nav-icon">🎛️</span>
-        <span class="nav-label">Camera</span>
-      </button>
-      <button class="ui-nav-item" onclick="switchNavTab('tab-sd')" id="nav-btn-sd">
-        <span class="nav-icon">📁</span>
-        <span class="nav-label">SD Card</span>
-      </button>
-      <button class="ui-nav-item" onclick="switchNavTab('tab-tg')" id="nav-btn-tg">
-        <span class="nav-icon">🤖</span>
-        <span class="nav-label">Telegram</span>
-      </button>
-      <button class="ui-nav-item" onclick="switchNavTab('tab-sys')" id="nav-btn-sys">
-        <span class="nav-icon">⚙️</span>
-        <span class="nav-label">System</span>
-      </button>
-    </nav>
-
     <div class="ui-header-right">
       <button class="ui-btn ui-btn-icon-only" id="header-btn-flash" onclick="toggleFlash()" title="Toggle Flash LED">💡</button>
       <button class="ui-btn ui-btn-icon-only ui-btn-accent" onclick="capturePhoto()" title="Take Snapshot Photo">📷</button>
     </div>
   </header>
 
-  <!-- ─── Main Content Wrapper ─── -->
-  <main class="ui-content">
+  <!-- ─── Main Unified Layout ─── -->
+  <div class="main-layout">
 
-    <!-- ─── Tab 1: Live Stream (Desktop Left Column / Mobile Primary View) ─── -->
-    <section class="tab-pane active desktop-stream-col" id="tab-stream">
+    <!-- ─── Stream Section (Video + Snapshot/Flash Toolbar + FPS & Telemetry Strip) ─── -->
+    <div class="desktop-stream-pane">
+      
+      <!-- Video Viewport with HUD -->
       <div class="viewport-box" id="viewport-box">
         <div class="hud-overlay">
           <div class="hud-live-dot" id="live-indicator"></div>
@@ -761,7 +699,7 @@ const char index_html[] PROGMEM = R"rawliteral(
         </div>
       </div>
 
-      <!-- Live Hardware Telemetry Strip -->
+      <!-- Stream FPS & Hardware Telemetry Strip -->
       <div class="telemetry-strip">
         <div class="stat-pill" style="color:#38bdf8;">
           <span class="hud-live-dot" id="pill-live-dot"></span>
@@ -776,314 +714,336 @@ const char index_html[] PROGMEM = R"rawliteral(
         <div class="stat-pill" id="stat-uptime" style="color:#10b981;">⏱ 0s</div>
         <div class="stat-pill" id="stat-ip" style="color:var(--jqm-text-muted);">🌐 --</div>
       </div>
-    </section>
 
-    <!-- ─── Tab 2: Camera & OV2640 Sensor Settings ─── -->
-    <section class="tab-pane desktop-hub-col" id="tab-cam">
-      <div class="ui-listview-inset">
-        <div class="ui-list-divider">
-          <span>Resolution & Stream Pacing</span>
-          <span class="ui-val-badge" id="val-fps-badge">25 FPS</span>
-        </div>
-        
-        <div class="ui-field-contain">
-          <div class="ui-field-row">
-            <span class="ui-label">Frame Resolution</span>
+      <!-- ─── jQuery Mobile Sub-Navbar: Camera, SD Card, Telegram, Settings (DIRECTLY BELLOW SNAPSHOT, FLASH OFF & FPS INFO) ─── -->
+      <nav class="ui-subnav" id="stream-subnav">
+        <button class="ui-subnav-btn ui-btn-active" onclick="switchSection('cam')" id="subnav-btn-cam">
+          <span class="subnav-icon">🎛️</span> Camera
+        </button>
+        <button class="ui-subnav-btn" onclick="switchSection('sd')" id="subnav-btn-sd">
+          <span class="subnav-icon">📁</span> SD Card
+        </button>
+        <button class="ui-subnav-btn" onclick="switchSection('tg')" id="subnav-btn-tg">
+          <span class="subnav-icon">🤖</span> Telegram
+        </button>
+        <button class="ui-subnav-btn" onclick="switchSection('sys')" id="subnav-btn-sys">
+          <span class="subnav-icon">⚙️</span> Settings
+        </button>
+      </nav>
+
+    </div>
+
+    <!-- ─── Control Panels (Placed Directly Below or in Desktop Hub Pane) ─── -->
+    <div class="desktop-controls-pane sections-container">
+
+      <!-- ─── 1. CAMERA & SENSOR PANEL ─── -->
+      <section class="section-pane active" id="pane-cam">
+        <div class="ui-listview-inset">
+          <div class="ui-list-divider">
+            <span>Resolution & Stream Pacing</span>
+            <span class="ui-val-badge" id="val-fps-badge">25 FPS</span>
           </div>
-          <select id="sel-res" onchange="updateControl('framesize', this.value)">
-            <option value="10">UXGA (1600x1200)</option>
-            <option value="9">SXGA (1280x1024)</option>
-            <option value="8">XGA (1024x768)</option>
-            <option value="7">SVGA (800x600)</option>
-            <option value="6" selected>VGA (640x480) - Real-time</option>
-            <option value="5">CIF (400x296)</option>
-            <option value="4">QVGA (320x240)</option>
-          </select>
-        </div>
-
-        <div class="ui-field-contain">
-          <div class="ui-field-row">
-            <span class="ui-label">Stream FPS Limit</span>
-            <span class="ui-val-badge" id="disp-fps">25</span>
+          
+          <div class="ui-field-contain">
+            <div class="ui-field-row">
+              <span class="ui-label">Frame Resolution</span>
+            </div>
+            <select id="sel-res" onchange="updateControl('framesize', this.value)">
+              <option value="10">UXGA (1600x1200)</option>
+              <option value="9">SXGA (1280x1024)</option>
+              <option value="8">XGA (1024x768)</option>
+              <option value="7">SVGA (800x600)</option>
+              <option value="6" selected>VGA (640x480) - Real-time</option>
+              <option value="5">CIF (400x296)</option>
+              <option value="4">QVGA (320x240)</option>
+            </select>
           </div>
-          <input type="range" min="1" max="30" value="25" id="rng-fps" oninput="document.getElementById('disp-fps').innerText=this.value" onchange="updateControl('fps', this.value); document.getElementById('val-fps-badge').innerText=this.value+' FPS';">
-        </div>
 
-        <div class="ui-field-contain">
-          <div class="ui-field-row">
-            <span class="ui-label">JPEG Quality (Lower = Better)</span>
-            <span class="ui-val-badge" id="disp-quality">14</span>
+          <div class="ui-field-contain">
+            <div class="ui-field-row">
+              <span class="ui-label">Stream FPS Limit</span>
+              <span class="ui-val-badge" id="disp-fps">25</span>
+            </div>
+            <input type="range" min="1" max="30" value="25" id="rng-fps" oninput="document.getElementById('disp-fps').innerText=this.value" onchange="updateControl('fps', this.value); document.getElementById('val-fps-badge').innerText=this.value+' FPS';">
           </div>
-          <input type="range" min="10" max="63" value="14" id="rng-quality" oninput="document.getElementById('disp-quality').innerText=this.value" onchange="updateControl('quality', this.value)">
-        </div>
-      </div>
 
-      <div class="ui-listview-inset">
-        <div class="ui-list-divider">Picture Adjustments</div>
-        
-        <div class="ui-field-contain">
-          <div class="ui-field-row">
-            <span class="ui-label">Brightness</span>
-            <span class="ui-val-badge" id="disp-bright">0</span>
+          <div class="ui-field-contain">
+            <div class="ui-field-row">
+              <span class="ui-label">JPEG Quality (Lower = Better)</span>
+              <span class="ui-val-badge" id="disp-quality">14</span>
+            </div>
+            <input type="range" min="10" max="63" value="14" id="rng-quality" oninput="document.getElementById('disp-quality').innerText=this.value" onchange="updateControl('quality', this.value)">
           </div>
-          <input type="range" min="-2" max="2" value="0" id="rng-bright" oninput="document.getElementById('disp-bright').innerText=this.value" onchange="updateControl('brightness', this.value)">
         </div>
 
-        <div class="ui-field-contain">
-          <div class="ui-field-row">
-            <span class="ui-label">Contrast</span>
-            <span class="ui-val-badge" id="disp-contrast">0</span>
+        <div class="ui-listview-inset">
+          <div class="ui-list-divider">Picture Adjustments</div>
+          
+          <div class="ui-field-contain">
+            <div class="ui-field-row">
+              <span class="ui-label">Brightness</span>
+              <span class="ui-val-badge" id="disp-bright">0</span>
+            </div>
+            <input type="range" min="-2" max="2" value="0" id="rng-bright" oninput="document.getElementById('disp-bright').innerText=this.value" onchange="updateControl('brightness', this.value)">
           </div>
-          <input type="range" min="-2" max="2" value="0" id="rng-contrast" oninput="document.getElementById('disp-contrast').innerText=this.value" onchange="updateControl('contrast', this.value)">
-        </div>
 
-        <div class="ui-field-contain">
-          <div class="ui-field-row">
-            <span class="ui-label">Saturation</span>
-            <span class="ui-val-badge" id="disp-sat">0</span>
+          <div class="ui-field-contain">
+            <div class="ui-field-row">
+              <span class="ui-label">Contrast</span>
+              <span class="ui-val-badge" id="disp-contrast">0</span>
+            </div>
+            <input type="range" min="-2" max="2" value="0" id="rng-contrast" oninput="document.getElementById('disp-contrast').innerText=this.value" onchange="updateControl('contrast', this.value)">
           </div>
-          <input type="range" min="-2" max="2" value="0" id="rng-sat" oninput="document.getElementById('disp-sat').innerText=this.value" onchange="updateControl('saturation', this.value)">
-        </div>
 
-        <div class="ui-field-contain">
-          <div class="ui-field-row">
-            <span class="ui-label">Special Effect</span>
+          <div class="ui-field-contain">
+            <div class="ui-field-row">
+              <span class="ui-label">Saturation</span>
+              <span class="ui-val-badge" id="disp-sat">0</span>
+            </div>
+            <input type="range" min="-2" max="2" value="0" id="rng-sat" oninput="document.getElementById('disp-sat').innerText=this.value" onchange="updateControl('saturation', this.value)">
           </div>
-          <select id="sel-effect" onchange="updateControl('special_effect', this.value)">
-            <option value="0">No Effect</option>
-            <option value="1">Negative</option>
-            <option value="2">Grayscale</option>
-            <option value="3">Red Tint</option>
-            <option value="4">Green Tint</option>
-            <option value="5">Blue Tint</option>
-            <option value="6">Sepia</option>
-          </select>
-        </div>
 
-        <div class="ui-field-contain">
-          <div class="ui-field-row">
-            <span class="ui-label">White Balance Mode</span>
+          <div class="ui-field-contain">
+            <div class="ui-field-row">
+              <span class="ui-label">Special Effect</span>
+            </div>
+            <select id="sel-effect" onchange="updateControl('special_effect', this.value)">
+              <option value="0">No Effect</option>
+              <option value="1">Negative</option>
+              <option value="2">Grayscale</option>
+              <option value="3">Red Tint</option>
+              <option value="4">Green Tint</option>
+              <option value="5">Blue Tint</option>
+              <option value="6">Sepia</option>
+            </select>
           </div>
-          <select id="sel-wb" onchange="updateControl('wb_mode', this.value)">
-            <option value="0">Auto</option>
-            <option value="1">Sunny</option>
-            <option value="2">Cloudy</option>
-            <option value="3">Office</option>
-            <option value="4">Home</option>
-          </select>
+
+          <div class="ui-field-contain">
+            <div class="ui-field-row">
+              <span class="ui-label">White Balance Mode</span>
+            </div>
+            <select id="sel-wb" onchange="updateControl('wb_mode', this.value)">
+              <option value="0">Auto</option>
+              <option value="1">Sunny</option>
+              <option value="2">Cloudy</option>
+              <option value="3">Office</option>
+              <option value="4">Home</option>
+            </select>
+          </div>
+
+          <div class="ui-field-contain">
+            <div class="ui-field-row">
+              <span class="ui-label">Vertical Flip</span>
+              <div class="ui-flipswitch" id="flip-vflip" onclick="toggleFlipswitch('flip-vflip', 'vflip')">
+                <div class="ui-flipswitch-slider"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="ui-field-contain">
+            <div class="ui-field-row">
+              <span class="ui-label">Horizontal Mirror</span>
+              <div class="ui-flipswitch" id="flip-hmirror" onclick="toggleFlipswitch('flip-hmirror', 'hmirror')">
+                <div class="ui-flipswitch-slider"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="ui-field-contain">
+            <button class="ui-btn ui-btn-block ui-btn-success" onclick="saveCameraDefaults()">💾 Save Stream Defaults to Flash</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── 2. SD CARD FILE MANAGER PANEL ─── -->
+      <section class="section-pane" id="pane-sd">
+        <div class="ui-listview-inset">
+          <div class="ui-list-divider">
+            <span>SD Card Storage</span>
+            <span id="sd-usage-text" class="ui-val-badge">Loading...</span>
+          </div>
+          <div class="ui-field-contain">
+            <div class="fm-progress-bar"><div class="fm-progress-fill" id="sd-progress-fill"></div></div>
+          </div>
         </div>
 
-        <div class="ui-field-contain">
-          <div class="ui-field-row">
-            <span class="ui-label">Vertical Flip</span>
-            <div class="ui-flipswitch" id="flip-vflip" onclick="toggleFlipswitch('flip-vflip', 'vflip')">
-              <div class="ui-flipswitch-slider"></div>
+        <div class="ui-listview-inset" style="display:flex;flex-direction:column;">
+          <div class="fm-toolbar">
+            <div class="fm-breadcrumbs" id="fm-breadcrumbs">
+              <span class="fm-crumb" onclick="loadDirectory('/')">📁 Root</span>
+            </div>
+            <div style="display:flex;gap:0.35rem;">
+              <button class="ui-btn" id="btn-view-mode" onclick="toggleViewMode()" title="Toggle View">⊞ Grid</button>
+              <button class="ui-btn" onclick="navigateUpDir()" title="Parent Directory">⬆️ Up</button>
+              <button class="ui-btn" onclick="selectAllFiles()" title="Select All">☑️ All</button>
+              <button class="ui-btn" onclick="loadDirectory(currentFmPath)" title="Refresh">🔄</button>
+            </div>
+          </div>
+
+          <!-- Batch Action Bar -->
+          <div class="batch-bar" id="batch-bar">
+            <span id="batch-count" style="font-size:0.82rem;font-weight:700;color:#38bdf8;">0 selected</span>
+            <div style="display:flex;gap:0.35rem;">
+              <button class="ui-btn ui-btn-danger" onclick="deleteSelectedFiles()">🗑️ Delete</button>
+              <button class="ui-btn" onclick="clearSelection()">✕ Cancel</button>
+            </div>
+          </div>
+
+          <!-- Files Grid / List -->
+          <div id="fm-container" style="min-height:260px;overflow-y:auto;">
+            <div style="text-align:center;padding:2.5rem;color:var(--jqm-text-muted);">Loading files...</div>
+          </div>
+
+          <div class="ui-field-contain" style="border-top:1px solid var(--jqm-inset-border);display:flex;justify-content:space-between;align-items:center;">
+            <span class="ui-subtext">Format permanently erases SD card</span>
+            <button class="ui-btn ui-btn-danger" onclick="formatSDCard()">🧹 Format SD</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── 3. TELEGRAM BOT PANEL ─── -->
+      <section class="section-pane" id="pane-tg">
+        <div class="ui-listview-inset">
+          <div class="ui-list-divider">Telegram Bot Configuration</div>
+          
+          <div class="ui-field-contain">
+            <span class="ui-label">Bot Token</span>
+            <input type="password" id="cfg-tg-token" placeholder="8967102688:AAHEieQC2_ZHa9ci0DiPsc3O4uLclWdLJ-k">
+            <span class="ui-subtext">Obtain from @BotFather on Telegram</span>
+          </div>
+
+          <div class="ui-field-contain">
+            <span class="ui-label">Authorized Chat IDs</span>
+            <input type="text" id="cfg-tg-chat" placeholder="318862528, 987654321">
+            <span class="ui-subtext">Comma-separated user or group chat IDs</span>
+          </div>
+
+          <div class="ui-field-contain">
+            <button class="ui-btn ui-btn-block ui-btn-accent" onclick="saveSettings()">💾 Save Telegram Config</button>
+          </div>
+        </div>
+
+        <div class="ui-listview-inset">
+          <div class="ui-list-divider">🧪 Live TLS & HTTPS Diagnostics</div>
+
+          <div class="ui-field-contain">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;">
+              <button class="ui-btn ui-btn-accent" onclick="testRawHTTPS()">🔒 Test TLS Handshake</button>
+              <button class="ui-btn" onclick="sendTelegramTest('msg')">✉️ Send Text Test</button>
+            </div>
+            <button class="ui-btn ui-btn-block" style="margin-top:0.4rem;" onclick="sendTelegramTest('photo')">📸 Send Photo Test</button>
+
+            <div id="tg-diag-box" style="display:none;margin-top:0.6rem;font-size:0.75rem;background:#060a12;border:1px solid rgba(56,189,248,0.25);padding:0.65rem;border-radius:6px;white-space:pre-wrap;font-family:monospace;color:#38bdf8;"></div>
+          </div>
+
+          <div class="ui-field-contain">
+            <span class="ui-label">Supported Bot Commands</span>
+            <div style="font-size:0.78rem;color:var(--jqm-text-muted);display:flex;flex-direction:column;gap:0.25rem;">
+              <div><code>/photo</code> - Capture snapshot and return photo</div>
+              <div><code>/flash on</code> | <code>/flash off</code> - Toggle illumination LED</div>
+              <div><code>/status</code> - Uptime, WiFi RSSI, Heap & Clock info</div>
+              <div><code>/help</code> - List all commands</div>
             </div>
           </div>
         </div>
+      </section>
 
-        <div class="ui-field-contain">
-          <div class="ui-field-row">
-            <span class="ui-label">Horizontal Mirror</span>
-            <div class="ui-flipswitch" id="flip-hmirror" onclick="toggleFlipswitch('flip-hmirror', 'hmirror')">
-              <div class="ui-flipswitch-slider"></div>
+      <!-- ─── 4. SYSTEM & NETWORK SETTINGS PANEL ─── -->
+      <section class="section-pane" id="pane-sys">
+        <div class="ui-listview-inset">
+          <div class="ui-list-divider">Network & Hostname</div>
+          
+          <div class="ui-field-contain">
+            <span class="ui-label">mDNS Hostname</span>
+            <input type="text" id="cfg-mdns" placeholder="esp32cam">
+            <span class="ui-subtext">Access via http://esp32cam.local</span>
+          </div>
+
+          <div class="ui-field-contain">
+            <span class="ui-label">WiFi Network Name (SSID)</span>
+            <input type="text" id="cfg-ssid" placeholder="FTTH">
+          </div>
+
+          <div class="ui-field-contain">
+            <span class="ui-label">WiFi Password</span>
+            <input type="password" id="cfg-pass" placeholder="••••••••">
+          </div>
+
+          <div class="ui-field-contain">
+            <button class="ui-btn ui-btn-block ui-btn-accent" onclick="saveSettings()">💾 Save WiFi & Hostname</button>
+          </div>
+        </div>
+
+        <div class="ui-listview-inset">
+          <div class="ui-list-divider">
+            <span>NTP System Clock</span>
+            <span class="ui-val-badge" id="cfg-clock-display">--</span>
+          </div>
+
+          <div class="ui-field-contain">
+            <span class="ui-label">Timezone</span>
+            <select id="cfg-ntp-offset">
+              <option value="19800">UTC +05:30 (India Standard Time - IST)</option>
+              <option value="0">UTC +00:00 (GMT / UTC - London)</option>
+              <option value="3600">UTC +01:00 (CET - Paris, Berlin)</option>
+              <option value="7200">UTC +02:00 (EET - Cairo, Athens)</option>
+              <option value="10800">UTC +03:00 (MSK / Arabia - Moscow, Riyadh)</option>
+              <option value="14400">UTC +04:00 (GST - Dubai)</option>
+              <option value="21600">UTC +06:00 (BST - Dhaka)</option>
+              <option value="25200">UTC +07:00 (ICT - Bangkok, Jakarta)</option>
+              <option value="28800">UTC +08:00 (CST / SGT - Singapore, Beijing)</option>
+              <option value="32400">UTC +09:00 (JST / KST - Tokyo, Seoul)</option>
+              <option value="36000">UTC +10:00 (AEST - Sydney)</option>
+              <option value="-18000">UTC -05:00 (EST - New York)</option>
+              <option value="-21600">UTC -06:00 (CST - Chicago)</option>
+              <option value="-25200">UTC -07:00 (MST - Denver)</option>
+              <option value="-28800">UTC -08:00 (PST - Los Angeles)</option>
+            </select>
+          </div>
+
+          <div class="ui-field-contain">
+            <div class="ui-field-row">
+              <span class="ui-label">Daylight Saving (+1h)</span>
+              <div class="ui-flipswitch" id="flip-dst" onclick="toggleFlipswitch('flip-dst')">
+                <div class="ui-flipswitch-slider"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="ui-field-contain">
+            <span class="ui-label">Primary NTP Server</span>
+            <input type="text" id="cfg-ntp1" placeholder="pool.ntp.org">
+          </div>
+
+          <div class="ui-field-contain">
+            <button class="ui-btn ui-btn-block ui-btn-success" onclick="saveSettings()">💾 Save & Sync Clock</button>
+          </div>
+        </div>
+
+        <div class="ui-listview-inset">
+          <div class="ui-list-divider">Firmware OTA Flash</div>
+          <div class="ui-field-contain">
+            <span class="ui-label">Select .bin Firmware File</span>
+            <input type="file" id="ota-file" accept=".bin">
+            <div class="fm-progress-bar"><div class="fm-progress-fill" id="ota-progress"></div></div>
+            <button class="ui-btn ui-btn-block ui-btn-accent" style="margin-top:0.5rem;" onclick="uploadOTA()">⬆️ Flash Firmware Now</button>
+          </div>
+        </div>
+
+        <div class="ui-listview-inset">
+          <div class="ui-list-divider">Device Management</div>
+          <div class="ui-field-contain">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;">
+              <button class="ui-btn ui-btn-danger" onclick="restartDevice('soft')">🔄 Soft Reboot</button>
+              <button class="ui-btn ui-btn-danger" onclick="restartDevice('erase_nvs')">⚠️ Erase NVS</button>
             </div>
           </div>
         </div>
+      </section>
 
-        <div class="ui-field-contain">
-          <button class="ui-btn ui-btn-block ui-btn-success" onclick="saveCameraDefaults()">💾 Save Stream Defaults to Flash</button>
-        </div>
-      </div>
-    </section>
+    </div>
 
-    <!-- ─── Tab 3: SD Card File Explorer & Gallery ─── -->
-    <section class="tab-pane desktop-hub-col" id="tab-sd">
-      <div class="ui-listview-inset">
-        <div class="ui-list-divider">
-          <span>SD Card Storage</span>
-          <span id="sd-usage-text" class="ui-val-badge">Loading...</span>
-        </div>
-        <div class="ui-field-contain">
-          <div class="fm-progress-bar"><div class="fm-progress-fill" id="sd-progress-fill"></div></div>
-        </div>
-      </div>
-
-      <div class="ui-listview-inset" style="flex:1;display:flex;flex-direction:column;">
-        <div class="fm-toolbar">
-          <div class="fm-breadcrumbs" id="fm-breadcrumbs">
-            <span class="fm-crumb" onclick="loadDirectory('/')">📁 Root</span>
-          </div>
-          <div style="display:flex;gap:0.35rem;">
-            <button class="ui-btn" id="btn-view-mode" onclick="toggleViewMode()" title="Toggle View">⊞ Grid</button>
-            <button class="ui-btn" onclick="navigateUpDir()" title="Parent Directory">⬆️ Up</button>
-            <button class="ui-btn" onclick="selectAllFiles()" title="Select All">☑️ All</button>
-            <button class="ui-btn" onclick="loadDirectory(currentFmPath)" title="Refresh">🔄</button>
-          </div>
-        </div>
-
-        <!-- Batch Delete Bar -->
-        <div class="batch-bar" id="batch-bar">
-          <span id="batch-count" style="font-size:0.82rem;font-weight:700;color:#38bdf8;">0 selected</span>
-          <div style="display:flex;gap:0.35rem;">
-            <button class="ui-btn ui-btn-danger" onclick="deleteSelectedFiles()">🗑️ Delete</button>
-            <button class="ui-btn" onclick="clearSelection()">✕ Cancel</button>
-          </div>
-        </div>
-
-        <!-- Files Container -->
-        <div id="fm-container" style="flex:1;overflow-y:auto;min-height:260px;">
-          <div style="text-align:center;padding:2.5rem;color:var(--jqm-text-muted);">Loading files...</div>
-        </div>
-
-        <div class="ui-field-contain" style="border-top:1px solid var(--jqm-inset-border);display:flex;justify-content:space-between;align-items:center;">
-          <span class="ui-subtext">Format permanently erases SD card</span>
-          <button class="ui-btn ui-btn-danger" onclick="formatSDCard()">🧹 Format SD</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- ─── Tab 4: Telegram Server Hub & Diagnostics ─── -->
-    <section class="tab-pane desktop-hub-col" id="tab-tg">
-      <div class="ui-listview-inset">
-        <div class="ui-list-divider">Telegram Bot Configuration</div>
-        
-        <div class="ui-field-contain">
-          <span class="ui-label">Bot Token</span>
-          <input type="password" id="cfg-tg-token" placeholder="8967102688:AAHEieQC2_ZHa9ci0DiPsc3O4uLclWdLJ-k">
-          <span class="ui-subtext">Obtain from @BotFather on Telegram</span>
-        </div>
-
-        <div class="ui-field-contain">
-          <span class="ui-label">Authorized Chat IDs</span>
-          <input type="text" id="cfg-tg-chat" placeholder="318862528, 987654321">
-          <span class="ui-subtext">Comma-separated user or group chat IDs</span>
-        </div>
-
-        <div class="ui-field-contain">
-          <button class="ui-btn ui-btn-block ui-btn-accent" onclick="saveSettings()">💾 Save Telegram Config</button>
-        </div>
-      </div>
-
-      <div class="ui-listview-inset">
-        <div class="ui-list-divider">🧪 Live TLS & HTTPS Diagnostics</div>
-
-        <div class="ui-field-contain">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;">
-            <button class="ui-btn ui-btn-accent" onclick="testRawHTTPS()">🔒 Test TLS Handshake</button>
-            <button class="ui-btn" onclick="sendTelegramTest('msg')">✉️ Send Text Test</button>
-          </div>
-          <button class="ui-btn ui-btn-block" style="margin-top:0.4rem;" onclick="sendTelegramTest('photo')">📸 Send Photo Test</button>
-
-          <div id="tg-diag-box" style="display:none;margin-top:0.6rem;font-size:0.75rem;background:#060a12;border:1px solid rgba(56,189,248,0.25);padding:0.65rem;border-radius:6px;white-space:pre-wrap;font-family:monospace;color:#38bdf8;"></div>
-        </div>
-
-        <div class="ui-field-contain">
-          <span class="ui-label">Supported Bot Commands</span>
-          <div style="font-size:0.78rem;color:var(--jqm-text-muted);display:flex;flex-direction:column;gap:0.25rem;">
-            <div><code>/photo</code> - Capture snapshot and return photo</div>
-            <div><code>/flash on</code> | <code>/flash off</code> - Toggle illumination LED</div>
-            <div><code>/status</code> - Uptime, WiFi RSSI, Heap & Clock info</div>
-            <div><code>/help</code> - List all commands</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ─── Tab 5: System, WiFi, NTP & OTA Updates ─── -->
-    <section class="tab-pane desktop-hub-col" id="tab-sys">
-      <div class="ui-listview-inset">
-        <div class="ui-list-divider">Network & Hostname</div>
-        
-        <div class="ui-field-contain">
-          <span class="ui-label">mDNS Hostname</span>
-          <input type="text" id="cfg-mdns" placeholder="esp32cam">
-          <span class="ui-subtext">Access via http://esp32cam.local</span>
-        </div>
-
-        <div class="ui-field-contain">
-          <span class="ui-label">WiFi Network Name (SSID)</span>
-          <input type="text" id="cfg-ssid" placeholder="FTTH">
-        </div>
-
-        <div class="ui-field-contain">
-          <span class="ui-label">WiFi Password</span>
-          <input type="password" id="cfg-pass" placeholder="••••••••">
-        </div>
-
-        <div class="ui-field-contain">
-          <button class="ui-btn ui-btn-block ui-btn-accent" onclick="saveSettings()">💾 Save WiFi & Hostname</button>
-        </div>
-      </div>
-
-      <div class="ui-listview-inset">
-        <div class="ui-list-divider">
-          <span>NTP System Clock</span>
-          <span class="ui-val-badge" id="cfg-clock-display">--</span>
-        </div>
-
-        <div class="ui-field-contain">
-          <span class="ui-label">Timezone</span>
-          <select id="cfg-ntp-offset">
-            <option value="19800">UTC +05:30 (India Standard Time - IST)</option>
-            <option value="0">UTC +00:00 (GMT / UTC - London)</option>
-            <option value="3600">UTC +01:00 (CET - Paris, Berlin)</option>
-            <option value="7200">UTC +02:00 (EET - Cairo, Athens)</option>
-            <option value="10800">UTC +03:00 (MSK / Arabia - Moscow, Riyadh)</option>
-            <option value="14400">UTC +04:00 (GST - Dubai)</option>
-            <option value="21600">UTC +06:00 (BST - Dhaka)</option>
-            <option value="25200">UTC +07:00 (ICT - Bangkok, Jakarta)</option>
-            <option value="28800">UTC +08:00 (CST / SGT - Singapore, Beijing)</option>
-            <option value="32400">UTC +09:00 (JST / KST - Tokyo, Seoul)</option>
-            <option value="36000">UTC +10:00 (AEST - Sydney)</option>
-            <option value="-18000">UTC -05:00 (EST - New York)</option>
-            <option value="-21600">UTC -06:00 (CST - Chicago)</option>
-            <option value="-25200">UTC -07:00 (MST - Denver)</option>
-            <option value="-28800">UTC -08:00 (PST - Los Angeles)</option>
-          </select>
-        </div>
-
-        <div class="ui-field-contain">
-          <div class="ui-field-row">
-            <span class="ui-label">Daylight Saving (+1h)</span>
-            <div class="ui-flipswitch" id="flip-dst" onclick="toggleFlipswitch('flip-dst')">
-              <div class="ui-flipswitch-slider"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="ui-field-contain">
-          <span class="ui-label">Primary NTP Server</span>
-          <input type="text" id="cfg-ntp1" placeholder="pool.ntp.org">
-        </div>
-
-        <div class="ui-field-contain">
-          <button class="ui-btn ui-btn-block ui-btn-success" onclick="saveSettings()">💾 Save & Sync Clock</button>
-        </div>
-      </div>
-
-      <div class="ui-listview-inset">
-        <div class="ui-list-divider">Firmware OTA Flash</div>
-        <div class="ui-field-contain">
-          <span class="ui-label">Select .bin Firmware File</span>
-          <input type="file" id="ota-file" accept=".bin">
-          <div class="fm-progress-bar"><div class="fm-progress-fill" id="ota-progress"></div></div>
-          <button class="ui-btn ui-btn-block ui-btn-accent" style="margin-top:0.5rem;" onclick="uploadOTA()">⬆️ Flash Firmware Now</button>
-        </div>
-      </div>
-
-      <div class="ui-listview-inset">
-        <div class="ui-list-divider">Device Management</div>
-        <div class="ui-field-contain">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;">
-            <button class="ui-btn ui-btn-danger" onclick="restartDevice('soft')">🔄 Soft Reboot</button>
-            <button class="ui-btn ui-btn-danger" onclick="restartDevice('erase_nvs')">⚠️ Erase NVS</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-  </main>
+  </div>
 
   <!-- ─── Lightbox Modal for Media Preview ─── -->
   <div class="ui-popup-backdrop" id="modal-lightbox" onclick="closeLightbox()">
@@ -1116,6 +1076,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     let flashState = 0;
     let streamRetryTimer = null;
     let activeLightboxPath = '';
+    let currentSection = 'cam';
 
     // ─── Format Uptime ──────────────────────────────────────────
     function formatUptime(seconds) {
@@ -1124,34 +1085,24 @@ const char index_html[] PROGMEM = R"rawliteral(
       const m = Math.floor((seconds % 3600) / 60);
       const s = seconds % 60;
       if (d > 0) return `${d}d ${h.toString().padStart(2,'0')}h ${m.toString().padStart(2,'0')}m ${s.toString().padStart(2,'0')}s`;
-      if (h > 0) return `${h}h ${m.toString().padStart(2,'0')}h ${m.toString().padStart(2,'0')}s`;
+      if (h > 0) return `${h}h ${m.toString().padStart(2,'0')}m ${s.toString().padStart(2,'0')}s`;
       if (m > 0) return `${m}m ${s.toString().padStart(2,'0')}s`;
       return `${s}s`;
     }
 
-    // ─── Navigation Tabs Switcher ───────────────────────────────
-    function switchNavTab(tabId) {
-      const isDesktop = window.innerWidth >= 900;
-      
-      // Update nav button active states
-      document.querySelectorAll('.ui-nav-item').forEach(btn => {
-        btn.classList.toggle('ui-btn-active', btn.id === 'nav-btn-' + tabId.replace('tab-', ''));
+    // ─── Section Switcher (Camera, SD Card, Telegram, Settings) ──
+    function switchSection(secId) {
+      currentSection = secId;
+
+      // Update button active state
+      ['cam', 'sd', 'tg', 'sys'].forEach(s => {
+        const btn = document.getElementById('subnav-btn-' + s);
+        if (btn) btn.classList.toggle('ui-btn-active', s === secId);
+        const pane = document.getElementById('pane-' + s);
+        if (pane) pane.classList.toggle('active', s === secId);
       });
 
-      if (isDesktop) {
-        // On desktop: stream tab is fixed on left; right column swaps tabs
-        ['tab-cam', 'tab-sd', 'tab-tg', 'tab-sys'].forEach(t => {
-          const el = document.getElementById(t);
-          if (el) el.classList.toggle('active', t === tabId || (tabId === 'tab-stream' && t === 'tab-cam'));
-        });
-      } else {
-        // On mobile: single active tab at a time
-        document.querySelectorAll('.tab-pane').forEach(p => {
-          p.classList.toggle('active', p.id === tabId);
-        });
-      }
-
-      if (tabId === 'tab-sd') {
+      if (secId === 'sd') {
         loadStorageInfo();
         loadDirectory(currentFmPath);
       }
@@ -1278,7 +1229,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     }
 
     function capturePhoto() {
-      showToast('📸 Taking high-resolution snapshot...');
+      showToast('📸 Taking snapshot photo...');
       window.open('/capture', '_blank');
     }
 
@@ -1501,7 +1452,7 @@ const char index_html[] PROGMEM = R"rawliteral(
 
     function deleteSelectedFiles() {
       if (selectedFiles.size === 0) return;
-      if (!confirm(`Delete ${selectedFiles.size} selected items?`)) return;
+      if (!confirm(`Delete all ${selectedFiles.size} selected items?`)) return;
       const names = Array.from(selectedFiles).join(',');
       fetch(`/api/sdcard/delete?name=${encodeURIComponent(names)}`)
         .then(r => r.json())
@@ -1657,17 +1608,7 @@ const char index_html[] PROGMEM = R"rawliteral(
       pollTelemetry();
       setInterval(pollTelemetry, 2000);
       loadSystemSettings();
-
-      // Desktop layout sync
-      if (window.innerWidth >= 900) {
-        switchNavTab('tab-cam');
-      }
-    });
-
-    window.addEventListener('resize', () => {
-      if (window.innerWidth >= 900) {
-        document.getElementById('tab-stream').classList.add('active');
-      }
+      switchSection('cam');
     });
   </script>
 </body>
