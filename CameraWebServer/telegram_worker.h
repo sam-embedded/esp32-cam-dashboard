@@ -12,7 +12,7 @@ typedef enum {
 // ─── Queue message: kept small; photo is captured inside the worker task ──────
 typedef struct {
     TgJobType type;
-    char      text[512];        // used for TG_JOB_TEXT
+    char      text[768];        // used for TG_JOB_TEXT
     bool      capturePhoto;     // if true, worker captures frame before sending
 } TgJob;
 

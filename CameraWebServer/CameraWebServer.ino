@@ -119,6 +119,10 @@ static void initMDNS() {
     }
 }
 
+// ─── WiFi connection notification state ───────────────────────
+static volatile bool g_send_wifi_connect_notify = false;
+static bool          g_is_initial_boot_notify   = true;
+
 // ─── WiFi event handler ───────────────────────────────────────
 static void wifiEventHandler(WiFiEvent_t event) {
     switch (event) {
@@ -127,6 +131,7 @@ static void wifiEventHandler(WiFiEvent_t event) {
             g_ap_fallback    = false;
             Serial.printf("[WiFi] Connected! IP: %s\n", WiFi.localIP().toString().c_str());
             initMDNS();
+            g_send_wifi_connect_notify = true;
             break;
 
         case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
@@ -251,6 +256,57 @@ static void TaskTelemetry(void* pvParameters) {
             }
         }
 
+        // Automatic rich notification whenever WiFi connects or reconnects with IP
+        if (g_send_wifi_connect_notify && WiFi.status() == WL_CONNECTED && g_tg_ready) {
+            g_send_wifi_connect_notify = false;
+
+            // Allow SNTP up to 1.5s to acquire time if just connecting
+            uint32_t t_sync = millis();
+            while (!ntp_is_synchronized() && millis() - t_sync < 1500) {
+                vTaskDelay(pdMS_TO_TICKS(100));
+            }
+
+            char sdStatus[64];
+            if (sd_is_mounted()) {
+                uint64_t total = 0, used = 0;
+                sd_get_info(total, used);
+                uint64_t free_mb = (total > used) ? (total - used) / (1024 * 1024) : 0;
+                snprintf(sdStatus, sizeof(sdStatus), "Mounted (%lluMB free) ✅", free_mb);
+            } else {
+                snprintf(sdStatus, sizeof(sdStatus), "Not mounted ❌");
+            }
+
+            String timeStr = ntp_is_synchronized() ? (ntp_get_formatted_time() + " ✅") : String("Sync pending ⏳");
+            String hostStr = preferences.getString("mdns_name", "esp32cam");
+            uint32_t up = millis() / 1000;
+            String ipStr = WiFi.localIP().toString();
+
+            char notifyMsg[512];
+            snprintf(notifyMsg, sizeof(notifyMsg),
+                "%s\n"
+                "🌐 *IP:* `%s`\n"
+                "📡 *SSID:* `%s` (%d dBm)\n"
+                "🔗 *Dashboard:* http://%s.local\n"
+                "📹 *Live Stream:* http://%s:81/stream\n"
+                "⏱️ *Time:* `%s`\n"
+                "💾 *SD Card:* %s\n"
+                "🧠 *Heap:* %dKB | *PSRAM:* %dKB\n"
+                "⏱️ *Uptime:* %s",
+                g_is_initial_boot_notify ? "🚀 *ESP32-CAM Live & Online!*" : "📶 *WiFi Reconnected & Online!*",
+                ipStr.c_str(),
+                WiFi.SSID().c_str(), WiFi.RSSI(),
+                hostStr.c_str(),
+                ipStr.c_str(),
+                timeStr.c_str(),
+                sdStatus,
+                esp_get_free_heap_size() / 1024,
+                heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024,
+                formatUptime(up).c_str()
+            );
+            telegram_send_message(notifyMsg);
+            g_is_initial_boot_notify = false;
+        }
+
         // Blink status LED (GPIO33, active-low on AI-Thinker)
         static bool ledState = false;
         ledState = !ledState;
@@ -333,28 +389,6 @@ void setup() {
     recording_init();  // TaskRecording on Core 0, priority 1
 
     Serial.println("[BOOT] All tasks started");
-
-    // Boot notification – yield to FreeRTOS scheduler while Telegram task starts
-    vTaskDelay(pdMS_TO_TICKS(1500));
-    String timeStr = ntp_is_synchronized() ? ntp_get_formatted_time() : String("Syncing...");
-    String hostStr = preferences.getString("mdns_name", "esp32cam");
-    char bootMsg[320];
-    snprintf(bootMsg, sizeof(bootMsg),
-        "🚀 *ESP32-CAM Booted!*\n"
-        "🌐 IP: `%s`\n"
-        "🌐 URL: http://%s.local\n"
-        "🧠 Heap: %dKB | PSRAM: %dKB\n"
-        "📷 Camera: OV2640\n"
-        "💾 SD: %s\n"
-        "⏱️ Time: %s",
-        WiFi.localIP().toString().c_str(),
-        hostStr.c_str(),
-        esp_get_free_heap_size() / 1024,
-        heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024,
-        sd_is_mounted() ? "Mounted ✅" : "Not found ❌",
-        timeStr.c_str()
-    );
-    telegram_send_message(bootMsg);
 }
 
 // ─── loop() ──────────────────────────────────────────────────
