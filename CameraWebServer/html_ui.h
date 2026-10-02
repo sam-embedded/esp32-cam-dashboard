@@ -30,7 +30,8 @@ const char index_html[] PROGMEM = R"rawliteral(
       --jqm-danger: #ef4444;
       --jqm-warning: #f59e0b;
       --radius: 10px;
-      --header-height: 50px;
+      --header-height: 48px;
+      --bottom-nav-height: 56px;
     }
 
     * {
@@ -48,10 +49,9 @@ const char index_html[] PROGMEM = R"rawliteral(
       min-height: 100dvh;
       display: flex;
       flex-direction: column;
-      overflow-x: hidden;
     }
 
-    /* ─── jQuery Mobile Top App Header ─── */
+    /* ─── jQuery Mobile Top Header ─── */
     .ui-header {
       background: var(--jqm-bar-bg);
       border-bottom: 1px solid var(--jqm-bar-border);
@@ -130,18 +130,20 @@ const char index_html[] PROGMEM = R"rawliteral(
     }
     .ui-btn-block { width: 100%; }
 
-    /* ─── Stream & Video Viewport ─── */
+    /* ─── Video Viewport (FROZEN / STICKY WHILE SCROLLING) ─── */
     .viewport-box {
-      position: relative;
+      position: sticky;
+      top: var(--header-height);
+      z-index: 70;
       width: 100%;
       background: #000;
-      min-height: 220px;
-      max-height: 60vh;
+      height: clamp(185px, 30vh, 280px);
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
       border-bottom: 1px solid var(--jqm-bar-border);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.6);
     }
     #stream-img {
       max-width: 100%;
@@ -153,8 +155,8 @@ const char index_html[] PROGMEM = R"rawliteral(
     /* HUD Overlay on Video */
     .hud-overlay {
       position: absolute;
-      top: 10px;
-      left: 10px;
+      top: 8px;
+      left: 8px;
       background: rgba(15, 23, 42, 0.85);
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
@@ -181,7 +183,7 @@ const char index_html[] PROGMEM = R"rawliteral(
       box-shadow: 0 0 8px var(--jqm-success);
     }
 
-    /* ─── Stream Quick Action Toolbar (Below Video) ─── */
+    /* ─── Action Toolbar (Directly Below Video Viewport) ─── */
     .stream-toolbar {
       display: flex;
       align-items: center;
@@ -220,47 +222,10 @@ const char index_html[] PROGMEM = R"rawliteral(
       white-space: nowrap;
     }
 
-    /* ─── jQuery Mobile Sub-Navbar: Camera, SD Card, Telegram, Settings (Directly Below Stream & FPS Info) ─── */
-    .ui-subnav {
-      display: flex;
-      background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
-      border-bottom: 2px solid var(--jqm-bar-border);
-      position: sticky;
-      top: var(--header-height);
-      z-index: 50;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-    }
-    .ui-subnav-btn {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.35rem;
-      padding: 0.75rem 0.35rem;
-      background: transparent;
-      border: none;
-      border-right: 1px solid rgba(255,255,255,0.07);
-      color: var(--jqm-text-muted);
-      font-size: 0.82rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      touch-action: manipulation;
-      text-shadow: 0 1px 1px rgba(0,0,0,0.5);
-    }
-    .ui-subnav-btn:last-child { border-right: none; }
-    .ui-subnav-btn:active { background: rgba(2, 132, 199, 0.12); }
-    .ui-subnav-btn.ui-btn-active {
-      color: #38bdf8;
-      background: rgba(2, 132, 199, 0.22);
-      box-shadow: inset 0 -3px 0 #38bdf8;
-    }
-    .ui-subnav-btn .subnav-icon { font-size: 1.1rem; }
-
-    /* ─── Control Panels Container (Rendered Bellow) ─── */
+    /* ─── Active Section Panel Container (Directly Below Action Toolbar & Telemetry) ─── */
     .sections-container {
       flex: 1;
-      padding-bottom: 2rem;
+      padding-bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 1.5rem);
     }
     .section-pane {
       display: none;
@@ -268,6 +233,49 @@ const char index_html[] PROGMEM = R"rawliteral(
     }
     .section-pane.active { display: block; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ─── Persistent Bottom Sub-Navbar (jQuery Mobile Style) ─── */
+    .ui-subnav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+      border-top: 1px solid var(--jqm-bar-border);
+      display: flex;
+      z-index: 100;
+      box-shadow: 0 -3px 12px rgba(0, 0, 0, 0.6);
+    }
+    .ui-subnav-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      padding: 0.35rem 0.2rem;
+      background: transparent;
+      border: none;
+      border-right: 1px solid rgba(255,255,255,0.06);
+      color: var(--jqm-text-muted);
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      touch-action: manipulation;
+    }
+    .ui-subnav-btn:last-child { border-right: none; }
+    .ui-subnav-btn:active { background: rgba(2, 132, 199, 0.12); }
+    .ui-subnav-btn.ui-btn-active {
+      color: #38bdf8;
+      background: rgba(2, 132, 199, 0.2);
+      box-shadow: inset 0 3px 0 #38bdf8;
+    }
+    .ui-subnav-btn .subnav-icon { font-size: 1.25rem; }
 
     /* ─── jQuery Mobile Inset Listview ─── */
     .ui-listview-inset {
@@ -586,7 +594,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     /* ─── Toast Notifications ─── */
     .toast-box {
       position: fixed;
-      bottom: 24px;
+      bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 12px);
       left: 50%;
       transform: translateX(-50%);
       z-index: 999;
@@ -624,11 +632,11 @@ const char index_html[] PROGMEM = R"rawliteral(
       }
       .main-layout {
         display: grid;
-        grid-template-columns: 1.25fr 1fr;
+        grid-template-columns: 1.15fr 1fr;
         height: calc(100vh - var(--header-height));
         overflow: hidden;
       }
-      .desktop-stream-pane {
+      .desktop-left-pane {
         display: flex;
         flex-direction: column;
         border-right: 1px solid var(--jqm-bar-border);
@@ -637,20 +645,21 @@ const char index_html[] PROGMEM = R"rawliteral(
         overflow-y: auto;
       }
       .viewport-box {
+        position: static;
         flex: 1;
+        min-height: 320px;
+        height: unset;
         max-height: unset;
-        min-height: 340px;
       }
-      .desktop-controls-pane {
+      .desktop-right-pane {
         display: flex;
         flex-direction: column;
         height: 100%;
         overflow-y: auto;
         background: var(--jqm-page-bg);
       }
-      .ui-subnav {
-        position: sticky;
-        top: 0;
+      .sections-container {
+        padding-bottom: calc(var(--bottom-nav-height) + 1.5rem);
       }
     }
   </style>
@@ -668,13 +677,12 @@ const char index_html[] PROGMEM = R"rawliteral(
     </div>
   </header>
 
-  <!-- ─── Main Unified Layout ─── -->
+  <!-- ─── Unified Layout Container ─── -->
   <div class="main-layout">
 
-    <!-- ─── Stream Section (Video + Snapshot/Flash Toolbar + FPS & Telemetry Strip) ─── -->
-    <div class="desktop-stream-pane">
-      
-      <!-- Video Viewport with HUD -->
+    <!-- ─── Frozen Video Viewport Section ─── -->
+    <div class="desktop-left-pane">
+      <!-- Video Viewport (FROZEN / STICKY AT TOP WHILE SCROLLING) -->
       <div class="viewport-box" id="viewport-box">
         <div class="hud-overlay">
           <div class="hud-live-dot" id="live-indicator"></div>
@@ -714,27 +722,10 @@ const char index_html[] PROGMEM = R"rawliteral(
         <div class="stat-pill" id="stat-uptime" style="color:#10b981;">⏱ 0s</div>
         <div class="stat-pill" id="stat-ip" style="color:var(--jqm-text-muted);">🌐 --</div>
       </div>
-
-      <!-- ─── jQuery Mobile Sub-Navbar: Camera, SD Card, Telegram, Settings (DIRECTLY BELLOW SNAPSHOT, FLASH OFF & FPS INFO) ─── -->
-      <nav class="ui-subnav" id="stream-subnav">
-        <button class="ui-subnav-btn ui-btn-active" onclick="switchSection('cam')" id="subnav-btn-cam">
-          <span class="subnav-icon">🎛️</span> Camera
-        </button>
-        <button class="ui-subnav-btn" onclick="switchSection('sd')" id="subnav-btn-sd">
-          <span class="subnav-icon">📁</span> SD Card
-        </button>
-        <button class="ui-subnav-btn" onclick="switchSection('tg')" id="subnav-btn-tg">
-          <span class="subnav-icon">🤖</span> Telegram
-        </button>
-        <button class="ui-subnav-btn" onclick="switchSection('sys')" id="subnav-btn-sys">
-          <span class="subnav-icon">⚙️</span> Settings
-        </button>
-      </nav>
-
     </div>
 
-    <!-- ─── Control Panels (Placed Directly Below or in Desktop Hub Pane) ─── -->
-    <div class="desktop-controls-pane sections-container">
+    <!-- ─── Active Section Panel (Moved Directly to Action Toolbar / Controls Area) ─── -->
+    <div class="desktop-right-pane sections-container">
 
       <!-- ─── 1. CAMERA & SENSOR PANEL ─── -->
       <section class="section-pane active" id="pane-cam">
@@ -1044,6 +1035,26 @@ const char index_html[] PROGMEM = R"rawliteral(
     </div>
 
   </div>
+
+  <!-- ─── Persistent Bottom Sub-Navbar (jQuery Mobile Style) ─── -->
+  <nav class="ui-subnav" id="stream-subnav">
+    <button class="ui-subnav-btn ui-btn-active" onclick="switchSection('cam')" id="subnav-btn-cam">
+      <span class="subnav-icon">🎛️</span>
+      <span>Camera</span>
+    </button>
+    <button class="ui-subnav-btn" onclick="switchSection('sd')" id="subnav-btn-sd">
+      <span class="subnav-icon">📁</span>
+      <span>SD Card</span>
+    </button>
+    <button class="ui-subnav-btn" onclick="switchSection('tg')" id="subnav-btn-tg">
+      <span class="subnav-icon">🤖</span>
+      <span>Telegram</span>
+    </button>
+    <button class="ui-subnav-btn" onclick="switchSection('sys')" id="subnav-btn-sys">
+      <span class="subnav-icon">⚙️</span>
+      <span>Settings</span>
+    </button>
+  </nav>
 
   <!-- ─── Lightbox Modal for Media Preview ─── -->
   <div class="ui-popup-backdrop" id="modal-lightbox" onclick="closeLightbox()">
