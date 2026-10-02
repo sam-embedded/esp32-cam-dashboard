@@ -124,30 +124,17 @@ static void initMDNS() {
 static volatile bool g_send_wifi_connect_notify = false;
 static bool          g_is_initial_boot_notify   = true;
 
-// ─── WiFi event handler ───────────────────────────────────────
+// ─── WiFi event handler (strictly non-blocking) ───────────────
 static void wifiEventHandler(WiFiEvent_t event) {
     switch (event) {
         case ARDUINO_EVENT_WIFI_STA_GOT_IP:
             g_wifi_connected = true;
             g_ap_fallback    = false;
-            Serial.printf("[WiFi] Connected! IP: %s\n", WiFi.localIP().toString().c_str());
-
-            // Force robust public DNS servers (bypasses dead or misconfigured router DNS)
-            {
-                ip_addr_t d1, d2;
-                ipaddr_aton("8.8.8.8", &d1);
-                ipaddr_aton("1.1.1.1", &d2);
-                dns_setserver(0, &d1);
-                dns_setserver(1, &d2);
-            }
-
-            initMDNS();
             g_send_wifi_connect_notify = true;
             break;
 
         case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
             g_wifi_connected = false;
-            Serial.println("[WiFi] Disconnected – will auto-reconnect");
             break;
 
         default: break;
@@ -268,8 +255,20 @@ static void TaskTelemetry(void* pvParameters) {
         }
 
         // Automatic rich notification whenever WiFi connects or reconnects with IP
-        if (g_send_wifi_connect_notify && WiFi.status() == WL_CONNECTED && g_tg_ready) {
+        if (g_send_wifi_connect_notify && WiFi.status() == WL_CONNECTED) {
             g_send_wifi_connect_notify = false;
+
+            // Force robust public DNS servers (bypasses dead or misconfigured router DNS)
+            {
+                ip_addr_t d1, d2;
+                ipaddr_aton("8.8.8.8", &d1);
+                ipaddr_aton("1.1.1.1", &d2);
+                dns_setserver(0, &d1);
+                dns_setserver(1, &d2);
+            }
+
+            // Safe mDNS registration in task context
+            initMDNS();
 
             // Allow SNTP up to 1.5s to acquire time if just connecting
             uint32_t t_sync = millis();
@@ -352,22 +351,26 @@ void setup() {
     // WiFi
     WiFi.onEvent(wifiEventHandler);
     WiFi.mode(WIFI_STA);
+    WiFi.disconnect(true);
+    delay(100);
     WiFi.setSleep(false);
     WiFi.setTxPower(WIFI_POWER_19_5dBm);
     String ssid = preferences.getString("wifi_ssid", "FTTH");
     String pass = preferences.getString("wifi_pass", "Selva@home");
+    if (ssid.isEmpty()) ssid = "FTTH";
+    if (pass.isEmpty()) pass = "Selva@home";
     WiFi.setHostname("esp32cam");
     WiFi.setAutoReconnect(true);
     WiFi.begin(ssid.c_str(), pass.c_str());
     Serial.printf("[WiFi] Connecting to %s", ssid.c_str());
     uint32_t t0 = millis();
-    while (WiFi.status() != WL_CONNECTED && millis() - t0 < 30000) {
+    while (WiFi.status() != WL_CONNECTED && millis() - t0 < 25000) {
         delay(500); Serial.print('.');
     }
     Serial.println();
     if (WiFi.status() == WL_CONNECTED) {
         WiFi.setSleep(false);
-        Serial.printf("[WiFi] Connected: %s\n", WiFi.localIP().toString().c_str());
+        Serial.printf("[WiFi] Connected! IP: %s\n", WiFi.localIP().toString().c_str());
     } else {
         Serial.println("[WiFi] Initial connect timed out – watchdog will retry");
     }
