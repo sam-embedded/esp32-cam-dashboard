@@ -18,20 +18,39 @@
 #include "ntp_sync.h"
 #include <time.h>
 #include <vector>
-#include "lwip/tcpip.h"
-#include "lwip/netdb.h"
+#include <mbedtls/platform.h>
+#include <esp_heap_caps.h>
+
+// Allocate mbedTLS buffers from 4MB external PSRAM to completely eliminate DRAM exhaustion
+static void* mbedtls_custom_calloc(size_t n, size_t size) {
+    void* ptr = nullptr;
+    if (psramFound()) {
+        ptr = heap_caps_calloc(n, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    }
+    if (!ptr) {
+        ptr = calloc(n, size);
+    }
+    return ptr;
+}
+
+static void mbedtls_custom_free(void* ptr) {
+    free(ptr);
+}
 
 // ─── Custom WiFiClientSecure with safe DNS resolution & MFLN ──
 class TelegramClient : public WiFiClientSecure {
 public:
     TelegramClient() {
         setInsecure();
-        setTimeout(5);
-        setHandshakeTimeout(5);
+        setTimeout(10000);          // 10,000 milliseconds (10s) for socket read/connect
+        setHandshakeTimeout(10);    // 10 seconds for TLS handshake
     }
 
     int connect(const char* host, uint16_t port) override {
         setInsecure();
+        if (sslclient) {
+            mbedtls_ssl_conf_max_frag_len(&sslclient->ssl_conf, MBEDTLS_SSL_MAX_FRAG_LEN_2048);
+        }
 
         // 1. Primary: Standard Arduino WiFi DNS resolution (non-blocking, uses overridden DNS 8.8.8.8)
         IPAddress resolvedIP;
@@ -137,26 +156,70 @@ static void tgTestTask(void* pv) {
     String timeStr = ntp_get_formatted_time();
 
     TelegramClient testClient;
-    UniversalTelegramBot testBot(tok, testClient);
-    testBot.waitForResponse = 3000;
 
+    // Test Step 1: TLS Connect to api.telegram.org:443
     uint32_t t0 = millis();
-    bool ok = testBot.getMe();
-    uint32_t tls_ms = millis() - t0;
+    int conn = testClient.connect("api.telegram.org", 443);
+    uint32_t conn_ms = millis() - t0;
 
-    if (!ok) {
+    if (!conn) {
+        IPAddress resolvedIP;
+        bool dns_ok = WiFi.hostByName("api.telegram.org", resolvedIP);
+        char lastErr[128] = {0};
+        testClient.lastError(lastErr, sizeof(lastErr));
         char errBuf[256];
         snprintf(errBuf, sizeof(errBuf),
-            "{\"ok\":false,\"err\":\"getMe() failed (%ums)\",\"time\":\"%s\",\"target\":\"api.telegram.org:443\"}",
-            tls_ms, timeStr.c_str());
+            "{\"ok\":false,\"step\":\"connect_failed\",\"dns\":%s,\"ip\":\"%s\",\"conn_ms\":%u,\"err\":\"%s\",\"time\":\"%s\"}",
+            dns_ok ? "true" : "false", resolvedIP.toString().c_str(), conn_ms, lastErr, timeStr.c_str());
         ctx->result = String(errBuf);
-    } else {
-        char resBuf[512];
-        snprintf(resBuf, sizeof(resBuf),
-            "{\"ok\":true,\"tls_ms\":%u,\"method\":\"UniversalTelegramBot (Direct IPv4 SNI)\",\"status\":\"200 OK\",\"time\":\"%s\",\"resp\":\"@%s (%s)\"}",
-            tls_ms, timeStr.c_str(), testBot.userName.c_str(), testBot.name.c_str());
-        ctx->result = String(resBuf);
+        xSemaphoreGive(ctx->doneSem);
+        vTaskDelete(NULL);
+        return;
     }
+
+    // Test Step 2: Send HTTP GET /bot<token>/getMe
+    String req = String("GET /bot") + tok + "/getMe HTTP/1.1\r\n" +
+                 "Host: api.telegram.org\r\n" +
+                 "User-Agent: ESP32-CAM\r\n" +
+                 "Accept: application/json\r\n" +
+                 "Connection: close\r\n\r\n";
+    testClient.print(req);
+
+    // Test Step 3: Read HTTP Status and Body
+    uint32_t tRead = millis();
+    String respHeader = "";
+    String respBody = "";
+    while (testClient.connected() && millis() - tRead < 5000) {
+        if (testClient.available()) {
+            String line = testClient.readStringUntil('\n');
+            if (line == "\r" || line.length() == 0) break; // Header separator
+            if (respHeader.isEmpty()) respHeader = line;   // Status line (HTTP/1.1 200 OK)
+        }
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    tRead = millis();
+    while ((testClient.connected() || testClient.available()) && millis() - tRead < 3000) {
+        while (testClient.available() && respBody.length() < 300) {
+            respBody += (char)testClient.read();
+        }
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    testClient.stop();
+    uint32_t total_ms = millis() - t0;
+
+    respHeader.trim();
+    respBody.trim();
+    respBody.replace("\"", "'");
+    respBody.replace("\r", "");
+    respBody.replace("\n", " ");
+
+    char resBuf[512];
+    snprintf(resBuf, sizeof(resBuf),
+        "{\"ok\":%s,\"conn_ms\":%u,\"total_ms\":%u,\"status\":\"%s\",\"body\":\"%s\",\"time\":\"%s\"}",
+        respHeader.indexOf("200") >= 0 ? "true" : "false",
+        conn_ms, total_ms, respHeader.c_str(), respBody.c_str(), timeStr.c_str());
+    ctx->result = String(resBuf);
     xSemaphoreGive(ctx->doneSem);
     vTaskDelete(NULL);
 }
@@ -173,7 +236,7 @@ String telegram_test_raw_https() {
     TaskHandle_t hTask = NULL;
     xTaskCreatePinnedToCore(tgTestTask, "tgTestTask", 16384, &ctx, 3, &hTask, 0);
 
-    if (xSemaphoreTake(ctx.doneSem, pdMS_TO_TICKS(12000)) != pdTRUE) {
+    if (xSemaphoreTake(ctx.doneSem, pdMS_TO_TICKS(15000)) != pdTRUE) {
         if (hTask) vTaskDelete(hTask);
     }
     vSemaphoreDelete(ctx.doneSem);
@@ -423,6 +486,7 @@ void TaskTelegram(void* pvParameters) {
 
 // ─── Init ─────────────────────────────────────────────────────
 void telegram_init() {
+    mbedtls_platform_set_calloc_free(mbedtls_custom_calloc, mbedtls_custom_free);
     g_tg_queue = xQueueCreate(20, sizeof(TgJob));
     g_tg_ready = false;
     xTaskCreatePinnedToCore(TaskTelegram, "TaskTelegram", 16384, nullptr, 1, nullptr, 0);
