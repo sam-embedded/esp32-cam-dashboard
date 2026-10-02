@@ -18,6 +18,7 @@
 #include <SD_MMC.h>
 #include <Update.h>
 #include <freertos/semphr.h>
+#include <lwip/sockets.h>
 
 // ─── External deps ────────────────────────────────────────────
 extern Preferences       preferences;
@@ -63,39 +64,54 @@ static String urlDecode(const char* src) {
 #define PART_BOUNDARY "ESP32CAMStream"
 static const char* STREAM_CONTENT_TYPE =
     "multipart/x-mixed-replace;boundary=" PART_BOUNDARY;
-static const char* STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
-static const char* STREAM_PART     =
-    "Content-Type: image/jpeg\r\nContent-Length: %u\r\nX-Timestamp: %lu\r\n\r\n";
+
+volatile bool g_is_streaming = false;
 
 static esp_err_t stream_handler(httpd_req_t* req) {
+    g_is_streaming = true;
     esp_err_t res = ESP_OK;
-    char part_buf[128];
+    char part_buf[160];
 
     res = httpd_resp_set_type(req, STREAM_CONTENT_TYPE);
     if (res != ESP_OK) return res;
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    httpd_resp_set_hdr(req, "Cache-Control", "no-cache, no-store, must-revalidate");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache, no-store, must-revalidate, pre-check=0, post-check=0, max-age=0");
     httpd_resp_set_hdr(req, "Pragma", "no-cache");
+    httpd_resp_set_hdr(req, "X-Framerate", "25");
+
+    // Enable TCP_NODELAY to disable Nagle's algorithm for instant low-latency delivery
+    int sockfd = httpd_req_to_sockfd(req);
+    if (sockfd >= 0) {
+        int nodelay = 1;
+        setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay));
+    }
+
+    int target_interval_ms = 1000 / (g_stream_fps > 0 ? g_stream_fps : 25);
 
     while (true) {
+        uint32_t frame_start = millis();
         camera_fb_t* fb = nullptr;
 
-        if (xSemaphoreTake(camera_mutex, pdMS_TO_TICKS(150)) == pdTRUE) {
+        if (xSemaphoreTake(camera_mutex, pdMS_TO_TICKS(80)) == pdTRUE) {
             fb = esp_camera_fb_get();
             xSemaphoreGive(camera_mutex);
         }
 
         if (!fb || fb->len == 0) {
             if (fb) esp_camera_fb_return(fb);
-            vTaskDelay(pdMS_TO_TICKS(15));
+            vTaskDelay(pdMS_TO_TICKS(5));
             continue;
         }
 
-        res = httpd_resp_send_chunk(req, STREAM_BOUNDARY, strlen(STREAM_BOUNDARY));
-        if (res == ESP_OK) {
-            size_t hlen = snprintf(part_buf, sizeof(part_buf), STREAM_PART, fb->len, millis());
-            res = httpd_resp_send_chunk(req, part_buf, hlen);
-        }
+        // Single combined header chunk to eliminate TCP packet fragmentation and latency
+        size_t hlen = snprintf(part_buf, sizeof(part_buf),
+            "\r\n--" PART_BOUNDARY "\r\n"
+            "Content-Type: image/jpeg\r\n"
+            "Content-Length: %u\r\n"
+            "X-Timestamp: %lu\r\n\r\n",
+            fb->len, (unsigned long)millis());
+
+        res = httpd_resp_send_chunk(req, part_buf, hlen);
         if (res == ESP_OK) {
             res = httpd_resp_send_chunk(req, (const char*)fb->buf, fb->len);
         }
@@ -104,15 +120,19 @@ static esp_err_t stream_handler(httpd_req_t* req) {
 
         if (res != ESP_OK) break;   // Client closed connection or network dropped
 
-        // Configurable FPS pacing (e.g. 25fps = 40ms)
-        int delay_ms = 1000 / (g_stream_fps > 0 ? g_stream_fps : 25);
-        if (delay_ms < 10) delay_ms = 10;
-        vTaskDelay(pdMS_TO_TICKS(delay_ms));
+        // Adaptive pacing: only sleep the remainder of the target frame period
+        uint32_t elapsed = millis() - frame_start;
+        if ((int)elapsed < target_interval_ms) {
+            vTaskDelay(pdMS_TO_TICKS(target_interval_ms - elapsed));
+        } else {
+            taskYIELD();
+        }
     }
 
     if (res == ESP_OK) {
         httpd_resp_send_chunk(req, nullptr, 0);
     }
+    g_is_streaming = false;
     return res;
 }
 

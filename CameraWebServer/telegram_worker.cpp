@@ -382,22 +382,24 @@ void TaskTelegram(void* pvParameters) {
             }
         }
 
-        // ── 2. Poll incoming Telegram commands with adaptive backoff ──
-        if (millis() - pollTick > pollInterval || did_job) {
+        // ── 2. Poll incoming Telegram commands with intelligent backoff ──
+        extern volatile bool g_is_streaming;
+        uint32_t activeInterval = g_is_streaming ? 30000 : pollInterval;
+        if (millis() - pollTick > activeInterval) {
             pollTick = millis();
             if (WiFi.status() == WL_CONNECTED && !tg_token.isEmpty()) {
                 int numNew = g_bot->getUpdates(g_bot->last_message_received + 1);
                 if (numNew > 0) {
-                    pollInterval = 2000;
+                    pollInterval = 5000;
                     while (numNew) {
                         handleNewMessages(numNew);
                         numNew = g_bot->getUpdates(g_bot->last_message_received + 1);
                     }
                 } else if (numNew < 0) {
-                    // Back off to 6s on network error to prevent hammering
-                    pollInterval = 6000;
+                    // Back off to 20s on network error
+                    pollInterval = 20000;
                 } else {
-                    pollInterval = 2000;
+                    pollInterval = 10000;
                 }
             }
         }
@@ -423,5 +425,5 @@ void TaskTelegram(void* pvParameters) {
 void telegram_init() {
     g_tg_queue = xQueueCreate(20, sizeof(TgJob));
     g_tg_ready = false;
-    xTaskCreatePinnedToCore(TaskTelegram, "TaskTelegram", 16384, nullptr, 2, nullptr, 0);
+    xTaskCreatePinnedToCore(TaskTelegram, "TaskTelegram", 16384, nullptr, 1, nullptr, 0);
 }

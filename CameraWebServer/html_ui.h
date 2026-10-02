@@ -503,8 +503,8 @@ const char index_html[] PROGMEM = R"rawliteral(
 
     <!-- JPEG Quality -->
     <div class="ctrl-group">
-      <div class="ctrl-header"><span>JPEG Quality</span><span id="val-quality">12</span></div>
-      <input type="range" min="10" max="63" value="12" id="rng-quality" oninput="document.getElementById('val-quality').innerText=this.value" onchange="updateControl('quality', this.value)">
+      <div class="ctrl-header"><span>JPEG Quality</span><span id="val-quality">14</span></div>
+      <input type="range" min="10" max="63" value="14" id="rng-quality" oninput="document.getElementById('val-quality').innerText=this.value" onchange="updateControl('quality', this.value)">
     </div>
 
     <!-- Brightness, Contrast, Saturation -->

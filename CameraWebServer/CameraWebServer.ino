@@ -53,7 +53,7 @@ static bool initCamera() {
     config.grab_mode    = CAMERA_GRAB_LATEST; // Always grab the freshest frame (zero lag)
     if (psramFound()) {
         config.frame_size   = FRAMESIZE_VGA;
-        config.jpeg_quality = 12;             // High quality, smooth fast JPEG encode
+        config.jpeg_quality = 14;             // High speed, ~20KB per frame (smooth real-time 25fps)
         config.fb_count     = 2;              // Double buffer in PSRAM
         config.fb_location  = CAMERA_FB_IN_PSRAM;
     } else {
@@ -71,7 +71,7 @@ static bool initCamera() {
     sensor_t* s = esp_camera_sensor_get();
     if (s) {
         int fs   = preferences.getInt("cam_framesize", FRAMESIZE_VGA);
-        int qual = preferences.getInt("cam_quality", 12);
+        int qual = preferences.getInt("cam_quality", 14);
         int br   = preferences.getInt("cam_bright", 0);
         int co   = preferences.getInt("cam_contrast", 0);
         int sa   = preferences.getInt("cam_sat", 0);
@@ -140,6 +140,7 @@ static void wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info) {
             dns_setserver(0, &d1);
             dns_setserver(1, &d2);
 
+            WiFi.setSleep(false); // Disable WiFi modem sleep for zero-lag streaming
             g_wifi_connected = true;
             g_ap_fallback    = false;
             g_send_wifi_connect_notify = true;

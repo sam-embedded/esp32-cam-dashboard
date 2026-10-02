@@ -314,7 +314,7 @@ void TaskRecording(void* pvParameters) {
             uint8_t* frame_copy = nullptr;
             size_t   frame_copy_len = 0;
 
-            if (xSemaphoreTake(camera_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+            if (xSemaphoreTake(camera_mutex, pdMS_TO_TICKS(40)) == pdTRUE) {
                 camera_fb_t* fb = esp_camera_fb_get();
                 if (fb && fb->format == PIXFORMAT_JPEG && fb->len > 0) {
                     frame_copy = (uint8_t*)ps_malloc(fb->len);  // Use PSRAM for large frame copies
