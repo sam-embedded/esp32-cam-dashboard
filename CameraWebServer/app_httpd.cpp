@@ -991,7 +991,7 @@ void startCameraServer() {
     config.ctrl_port         = 32769;   // different ctrl socket port
     config.max_uri_handlers  = 45;
     config.max_open_sockets  = 4;       // 4 sockets saves ~15KB internal DRAM
-    config.stack_size        = 8192;
+    config.stack_size        = 16384;
     config.task_priority     = 4;
     config.core_id           = 1;
     config.recv_wait_timeout = 5;       // Fast recycling of closed/stalled connections

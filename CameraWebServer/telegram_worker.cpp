@@ -12,6 +12,7 @@
 #include <HTTPClient.h>
 #include <UniversalTelegramBot.h>
 #include <ArduinoJson.h>
+#include <ArduinoWebsockets.h>
 #include <Preferences.h>
 #include "esp_camera.h"
 #include <freertos/semphr.h>
@@ -752,6 +753,130 @@ void xiaozhi_announce_code(bool send_voice) {
     }
 }
 
+// ─── Live XiaoZhi Cloud AI Agent Query (WebSocket Protocol) ───
+String xiaozhi_cloud_ai_query(const String& prompt) {
+    if (WiFi.status() != WL_CONNECTED) return "";
+
+    String wsUrl = xiaozhi_get_ws_url();
+    String token = xiaozhi_get_ws_token();
+    String mac = xiaozhi_get_device_id();
+    String uuid = xiaozhi_get_client_id();
+
+    if (token.isEmpty()) {
+        xiaozhi_cloud_fetch_code();
+        token = xiaozhi_get_ws_token();
+    }
+    if (token.isEmpty()) {
+        token = "test-token";
+    }
+
+    websockets::WebsocketsClient wsClient;
+    wsClient.setInsecure();
+    wsClient.addHeader("Authorization", "Bearer " + token);
+    wsClient.addHeader("Protocol-Version", "1");
+    wsClient.addHeader("Device-Id", mac);
+    wsClient.addHeader("Client-Id", uuid);
+
+    Serial.printf("[XIAOZHI-WS] Querying Cloud AI for: '%s'...\n", prompt.c_str());
+    bool connected = wsClient.connect(wsUrl);
+    if (!connected) {
+        Serial.println("[XIAOZHI-WS] Connect failed, refreshing token...");
+        xiaozhi_cloud_fetch_code();
+        token = xiaozhi_get_ws_token();
+        wsClient.addHeader("Authorization", "Bearer " + token);
+        connected = wsClient.connect(wsUrl);
+        if (!connected) {
+            Serial.println("[XIAOZHI-WS] Reconnect failed");
+            return "";
+        }
+    }
+
+    String sessionId = "";
+    String accumulatedText = "";
+    bool helloAck = false;
+    bool finished = false;
+    uint32_t lastDataTime = millis();
+
+    wsClient.onMessage([&](websockets::WebsocketsMessage message) {
+        lastDataTime = millis();
+        if (!message.isText()) return; // ignore binary opus audio frames
+        String payload = message.data();
+        JsonDocument doc;
+        DeserializationError err = deserializeJson(doc, payload);
+        if (err) return;
+
+        const char* type = doc["type"] | "";
+        if (strcmp(type, "hello") == 0) {
+            sessionId = doc["session_id"].as<String>();
+            helloAck = true;
+        } else if (strcmp(type, "tts") == 0) {
+            const char* state = doc["state"] | "";
+            if (strcmp(state, "sentence_start") == 0) {
+                const char* t = doc["text"] | "";
+                if (t && strlen(t) > 0) {
+                    if (accumulatedText.length() > 0 && !accumulatedText.endsWith(" ") && !accumulatedText.endsWith("\n")) {
+                        accumulatedText += " ";
+                    }
+                    accumulatedText += t;
+                }
+            } else if (strcmp(state, "stop") == 0) {
+                finished = true;
+            }
+        } else if (strcmp(type, "llm") == 0) {
+            const char* t = doc["text"] | "";
+            if (t && strlen(t) > 0) {
+                if (doc["emotion"].isNull()) {
+                    accumulatedText += t;
+                }
+            }
+            if (!doc["finish_reason"].isNull()) {
+                finished = true;
+            }
+        }
+    });
+
+    // 1. Send hello handshake
+    String helloMsg = "{\"type\":\"hello\",\"version\":1,\"features\":{\"mcp\":true},\"transport\":\"websocket\",\"audio_params\":{\"format\":\"opus\",\"sample_rate\":16000,\"channels\":1,\"frame_duration\":60}}";
+    wsClient.send(helloMsg);
+
+    // Wait for hello ack (max 3500ms)
+    uint32_t t0 = millis();
+    while (!helloAck && (millis() - t0 < 3500)) {
+        wsClient.poll();
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    if (!helloAck || sessionId.isEmpty()) {
+        wsClient.close();
+        return "";
+    }
+
+    // 2. Send prompt as listen detect
+    JsonDocument promptDoc;
+    promptDoc["session_id"] = sessionId;
+    promptDoc["type"] = "listen";
+    promptDoc["state"] = "detect";
+    promptDoc["text"] = prompt;
+    String promptJson;
+    serializeJson(promptDoc, promptJson);
+    wsClient.send(promptJson);
+
+    // 3. Receive streaming response (max 15000ms)
+    uint32_t t1 = millis();
+    lastDataTime = millis();
+    while (!finished && (millis() - t1 < 15000)) {
+        wsClient.poll();
+        vTaskDelay(pdMS_TO_TICKS(15));
+        if (accumulatedText.length() > 0 && (millis() - lastDataTime > 2500)) {
+            break;
+        }
+    }
+
+    wsClient.close();
+    accumulatedText.trim();
+    return accumulatedText;
+}
+
 // ─── XiaoZhi AI (小智) Edge Agent Engine ───────────────────────
 String xiaozhi_ai_chat(const String& prompt) {
     String text = prompt;
@@ -1039,7 +1164,13 @@ String xiaozhi_ai_chat(const String& prompt) {
                "• `Reboot` — Safely restart device";
     }
 
-    // 17. Fallback
+    // 17. Query XiaoZhi Cloud AI over WebSocket
+    String aiResponse = xiaozhi_cloud_ai_query(text);
+    if (aiResponse.length() > 0) {
+        return "🤖 *" + agentName + ":*\n\n" + aiResponse;
+    }
+
+    // 18. Fallback
     return "🤖 *" + agentName + ":* I received: _\"" + text + "\"_\n\n" +
            (sysPrompt.length() > 0 ? ("*Directive:* " + sysPrompt + "\n\n") : "") +
            "You can ask me to take a photo (`photo`), check `weather`, play `music`, switch `/model`, query `knowledge`, or report `status`. Type `help` for full controls!";
@@ -1405,5 +1536,5 @@ void telegram_init() {
     mbedtls_platform_set_calloc_free(mbedtls_custom_calloc, mbedtls_custom_free);
     g_tg_queue = xQueueCreate(20, sizeof(TgJob));
     g_tg_ready = false;
-    xTaskCreatePinnedToCore(TaskTelegram, "TaskTelegram", 16384, nullptr, 1, nullptr, 0);
+    xTaskCreatePinnedToCore(TaskTelegram, "TaskTelegram", 24576, nullptr, 1, nullptr, 0);
 }
