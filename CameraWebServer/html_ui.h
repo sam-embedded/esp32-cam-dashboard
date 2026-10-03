@@ -1173,42 +1173,57 @@ I have full control over camera capture, flash spotlight, SD card storage, and s
           </div>
         </div>
 
-        <!-- ⚙️ XiaoZhi Cloud Agent Configuration & MCP Card -->
+        <!-- ⚙️ XiaoZhi Cloud Agent Configuration & Protocol Card -->
         <div class="card" style="border-color:rgba(99,102,241,0.4);background:linear-gradient(180deg, rgba(99,102,241,0.08), rgba(15,23,42,0.6));">
           <div class="card-header">
-            <span>⚙️ XiaoZhi Agent & Model Configuration</span>
-            <span class="val-badge" style="background:rgba(99,102,241,0.25);color:#a5b4fc;">Cloud Managed</span>
+            <span>⚙️ XiaoZhi Cloud Agent & Connection Protocol</span>
+            <span class="val-badge" id="xz-protocol-badge" style="background:rgba(99,102,241,0.25);color:#a5b4fc;">Cloud Managed</span>
           </div>
 
           <div class="form-group" style="padding:0.25rem 0;">
             <div style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.75rem;margin-bottom:0.75rem;">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
-                <span style="font-weight:700;font-size:0.85rem;color:#fff;">XiaoZhi AI (小智) Agent</span>
+                <span style="font-weight:700;font-size:0.85rem;color:#fff;">XiaoZhi AI (小智) Cloud Central</span>
                 <span style="font-size:0.7rem;background:rgba(34,197,94,0.2);color:#4ade80;padding:2px 8px;border-radius:10px;font-weight:600;">Managed on xiaozhi.me ✅</span>
               </div>
               <p style="font-size:0.78rem;color:var(--text-muted);line-height:1.45;margin-bottom:0.6rem;">
-                Agent personality, character persona, system prompts, voices, memory, knowledge base, and model selection (Qwen 3.6, DeepSeek V4, DouBao Pro, Xiaozhi Lite, GPT-5) are centrally configured and synchronized in real-time from the official XiaoZhi console.
+                Agent personality, character persona, system prompts, voices, memory, knowledge base, and model selection are centrally configured and synchronized in real-time from the official XiaoZhi console.
               </p>
               <a href="https://xiaozhi.me/console/agents" target="_blank" class="btn btn-accent btn-block" style="text-decoration:none;gap:0.4rem;">
                 🔗 Open xiaozhi.me Agent Console
               </a>
             </div>
 
-            <div class="form-group">
+            <!-- Authentic Connection Protocol Info from 78/xiaozhi-esp32 -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.75rem;background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:0.6rem;margin-bottom:0.75rem;">
+              <div>
+                <span style="color:var(--text-muted);display:block;font-size:0.68rem;">DEVICE ID (MAC)</span>
+                <code id="xz-disp-mac" style="color:#38bdf8;">--:--:--:--:--:--</code>
+              </div>
+              <div>
+                <span style="color:var(--text-muted);display:block;font-size:0.68rem;">CLIENT UUID</span>
+                <code id="xz-disp-uuid" style="color:#a5b4fc;font-size:0.7rem;">--------</code>
+              </div>
+              <div style="grid-column:span 2;">
+                <span style="color:var(--text-muted);display:block;font-size:0.68rem;">OTA GATEWAY</span>
+                <code id="xz-disp-ota" style="color:#e2e8f0;word-break:break-all;">https://api.tenclass.net/xiaozhi/ota/</code>
+              </div>
+              <div style="grid-column:span 2;">
+                <span style="color:var(--text-muted);display:block;font-size:0.68rem;">WEBSOCKET GATEWAY</span>
+                <code id="xz-disp-ws" style="color:#4ade80;word-break:break-all;">wss://api.tenclass.net/xiaozhi/v1/</code>
+              </div>
+              <div style="grid-column:span 2;">
+                <span style="color:var(--text-muted);display:block;font-size:0.68rem;">MQTT ENDPOINT</span>
+                <code id="xz-disp-mqtt" style="color:#facc15;word-break:break-all;">api.tenclass.net</code>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom:0;">
               <div class="form-row">
                 <span class="form-label">🔊 Telegram Speaker Output (Voice Audio Notes)</span>
                 <div class="switch-toggle active" id="sw-tg-speaker" onclick="toggleSpeakerSwitch()"><div class="switch-slider"></div></div>
               </div>
               <span class="form-hint">Use Telegram as the ESP32-CAM wireless speaker (plays agent replies as voice notes)</span>
-            </div>
-
-            <div class="form-group" style="margin-bottom:0;">
-              <span class="form-label">🔌 Official XiaoZhi MCP Endpoint (Token Authenticated)</span>
-              <div style="display:flex;gap:0.4rem;">
-                <input type="text" id="cfg-xz-mcp-url" readonly style="font-family:monospace;font-size:0.72rem;background:rgba(0,0,0,0.4);" value="wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEwNzc3NTcsImFnZW50SWQiOjI0NDIzNzQsImVuZHBvaW50SWQiOiJhZ2VudF8yNDQyMzc0IiwicHVycG9zZSI6Im1jcC1lbmRwb2ludCIsImlhdCI6MTc5MTAzMTcwNSwiZXhwIjoxODIyNTg5MzA1fQ.dFR64uvHX7kJLC7V0nJcbelcoExST9SoMVtShjk3wkLhft-PSJ_5LbmYyIUQxVONSDJlJXLufaqD9mlp-05RmA">
-                <button class="btn btn-accent" onclick="copyMcpUrl()" title="Copy MCP URL">📋</button>
-              </div>
-              <span class="form-hint">Connected official endpoint for Weather, Music, Knowledge Base, and Vision tools</span>
             </div>
           </div>
         </div>
@@ -2122,15 +2137,42 @@ I have full control over camera capture, flash spotlight, SD card storage, and s
       updateControl('tg_voice', active ? 1 : 0);
     }
 
-    function copyMcpUrl() {
-      const inp = document.getElementById('cfg-xz-mcp-url');
-      if (inp) {
-        navigator.clipboard.writeText(inp.value).then(() => {
-          showToast('📋 MCP Endpoint URL copied to clipboard!');
-        }).catch(() => {
-          showToast('📋 Copied MCP URL');
-        });
-      }
+    function loadXiaoZhiSettings() {
+      fetch('/api/xiaozhi/settings')
+        .then(r => r.json())
+        .then(d => {
+          if (!d.ok) return;
+          if (d.device_id) {
+            const el = document.getElementById('xz-disp-mac');
+            if (el) el.innerText = d.device_id;
+          }
+          if (d.client_id) {
+            const el = document.getElementById('xz-disp-uuid');
+            if (el) el.innerText = d.client_id;
+          }
+          if (d.ota_url) {
+            const el = document.getElementById('xz-disp-ota');
+            if (el) el.innerText = d.ota_url;
+          }
+          if (d.websocket && d.websocket.url) {
+            const el = document.getElementById('xz-disp-ws');
+            if (el) el.innerText = d.websocket.url;
+          }
+          if (d.mqtt && d.mqtt.endpoint) {
+            const el = document.getElementById('xz-disp-mqtt');
+            if (el) el.innerText = d.mqtt.endpoint;
+          }
+          if (d.speaker_enabled !== undefined) {
+            const sw = document.getElementById('sw-tg-speaker');
+            if (sw) sw.classList.toggle('active', d.speaker_enabled === true);
+            const topBtn = document.getElementById('top-btn-speaker');
+            if (topBtn) topBtn.style.opacity = d.speaker_enabled ? '1' : '0.4';
+          }
+          if (d.linked !== undefined) {
+            updateCodeUI(d.linked ? 'ONLINE' : (d.code || ''), d.linked);
+          }
+        })
+        .catch(() => {});
     }
 
     // ─── Telegram Diagnostics ───────────────────────────────────
@@ -2309,6 +2351,7 @@ I have full control over camera capture, flash spotlight, SD card storage, and s
       pollTelemetry();
       setInterval(pollTelemetry, 2000);
       loadSystemSettings();
+      loadXiaoZhiSettings();
       checkXiaoZhiStatus();
       switchSection('cam');
     });

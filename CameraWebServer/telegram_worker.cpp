@@ -498,6 +498,27 @@ bool xiaozhi_cloud_fetch_code() {
                 preferences.putBool("xz_linked", true);
                 preferences.remove("xz_code");
                 preferences.remove("xz_challenge");
+
+                if (!doc["websocket"].isNull()) {
+                    if (doc["websocket"]["url"].is<const char*>()) {
+                        preferences.putString("xz_ws_url", doc["websocket"]["url"].as<const char*>());
+                    }
+                    if (doc["websocket"]["token"].is<const char*>()) {
+                        preferences.putString("xz_ws_tok", doc["websocket"]["token"].as<const char*>());
+                    }
+                }
+                if (!doc["mqtt"].isNull()) {
+                    if (doc["mqtt"]["endpoint"].is<const char*>()) {
+                        preferences.putString("xz_mqtt_ep", doc["mqtt"]["endpoint"].as<const char*>());
+                    }
+                    if (doc["mqtt"]["client_id"].is<const char*>()) {
+                        preferences.putString("xz_mqtt_cid", doc["mqtt"]["client_id"].as<const char*>());
+                    }
+                    if (doc["mqtt"]["publish_topic"].is<const char*>()) {
+                        preferences.putString("xz_mqtt_pub", doc["mqtt"]["publish_topic"].as<const char*>());
+                    }
+                }
+
                 Serial.println("[XIAOZHI] Device confirmed officially linked on xiaozhi.me!");
                 http.end();
                 return true;
@@ -608,8 +629,40 @@ bool xiaozhi_verify_code(const String& input_code, const String& chat_id) {
     return false;
 }
 
-// ─── Language Model & MCP Configuration ───────────────────────
-static const char* DEFAULT_MCP_ENDPOINT = "wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEwNzc3NTcsImFnZW50SWQiOjI0NDIzNzQsImVuZHBvaW50SWQiOiJhZ2VudF8yNDQyMzc0IiwicHVycG9zZSI6Im1jcC1lbmRwb2ludCIsImlhdCI6MTc5MTAzMTcwNSwiZXhwIjoxODIyNTg5MzA1fQ.dFR64uvHX7kJLC7V0nJcbelcoExST9SoMVtShjk3wkLhft-PSJ_5LbmYyIUQxVONSDJlJXLufaqD9mlp-05RmA";
+// ─── XiaoZhi Runtime Protocol & Connection Settings (78/xiaozhi-esp32) ─────
+String xiaozhi_get_device_id() {
+    String mac = WiFi.macAddress();
+    mac.toLowerCase();
+    return mac;
+}
+
+String xiaozhi_get_client_id() {
+    return preferences.getString("xz_uuid", "0248512d-c252-4a16-8298-14b223af6cdd");
+}
+
+String xiaozhi_get_ota_url() {
+    return preferences.getString("xz_ota_url", "https://api.tenclass.net/xiaozhi/ota/");
+}
+
+String xiaozhi_get_ws_url() {
+    return preferences.getString("xz_ws_url", "wss://api.tenclass.net/xiaozhi/v1/");
+}
+
+String xiaozhi_get_ws_token() {
+    return preferences.getString("xz_ws_tok", "");
+}
+
+String xiaozhi_get_mqtt_endpoint() {
+    return preferences.getString("xz_mqtt_ep", "api.tenclass.net");
+}
+
+String xiaozhi_get_mqtt_client_id() {
+    return preferences.getString("xz_mqtt_cid", "");
+}
+
+String xiaozhi_get_mqtt_publish_topic() {
+    return preferences.getString("xz_mqtt_pub", "device-server");
+}
 
 String xiaozhi_get_model_id() {
     return preferences.getString("xz_model_id", "qwen-3.6");
@@ -647,14 +700,6 @@ bool xiaozhi_set_model(const String& input) {
     return false;
 }
 
-String xiaozhi_get_mcp_url() {
-    return preferences.getString("xz_mcp_url", DEFAULT_MCP_ENDPOINT);
-}
-
-void xiaozhi_set_mcp_url(const String& url) {
-    preferences.putString("xz_mcp_url", url);
-}
-
 bool xiaozhi_is_speaker_enabled() {
     return preferences.getBool("tg_voice", true);
 }
@@ -671,22 +716,20 @@ void xiaozhi_announce_code(bool send_voice) {
     char msg[700];
     if (linked) {
         snprintf(msg, sizeof(msg),
-            "✨ *XiaoZhi AI (小智) Online Device*\n"
+            "✨ *XiaoZhi AI Online Device*\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "📡 *Status:* Device Linked on xiaozhi.me ✅\n"
             "🌐 *Device:* `esp32cam.local` | IP: `%s`\n"
             "🤖 *Cloud Agent:* Connected & Active\n"
-            "🧠 *Model:* %s (GitHub-Verified Tier)\n"
             "🔊 *Telegram Speaker:* %s\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "Ready for commands! Type `help`, upload photos for vision analysis, send voice notes, or switch `/model`.",
+            "Ready for commands! Type `help`, upload photos for vision analysis, or send voice notes.",
             WiFi.localIP().toString().c_str(),
-            xiaozhi_get_model_name().c_str(),
             xiaozhi_is_speaker_enabled() ? "Active (Voice Notes ON) 🔊" : "Muted (Text Only) 🔇"
         );
     } else {
         snprintf(msg, sizeof(msg),
-            "✨ *XiaoZhi AI (小智) Unlinked Device*\n"
+            "✨ *XiaoZhi AI Unlinked Device*\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "🔑 *6-Digit Verification Code:* `%s`\n"
             "🌐 *Device:* `esp32cam.local` | IP: `%s`\n"
@@ -703,7 +746,7 @@ void xiaozhi_announce_code(bool send_voice) {
 
     if (send_voice) {
         String voiceText = linked ?
-            ("XiaoZhi AI online with model " + xiaozhi_get_model_name() + ". Device is linked on XiaoZhi dot me console.") :
+            "XiaoZhi AI online. Device is linked on XiaoZhi dot me console." :
             ("XiaoZhi AI online. Unlinked device verification code is " + spokenDigits + ". Please bind your device on XiaoZhi dot me.");
         telegram_send_voice(voiceText.c_str());
     }
@@ -1338,9 +1381,9 @@ void TaskTelegram(void* pvParameters) {
             }
         }
 
-        // ── 4. XiaoZhi Official Cloud Poller (when unlinked) ──
+        // ── 4. XiaoZhi Official Cloud Poller (when unlinked or credentials missing) ──
         static uint32_t lastXzPoll = 0;
-        if (!xiaozhi_is_device_linked() && millis() - lastXzPoll > 15000) {
+        if ((!xiaozhi_is_device_linked() || preferences.getString("xz_ws_tok", "").isEmpty()) && millis() - lastXzPoll > 15000) {
             lastXzPoll = millis();
             if (WiFi.status() == WL_CONNECTED) {
                 bool wasLinked = xiaozhi_is_device_linked();

@@ -18,6 +18,7 @@
 #include <Preferences.h>
 #include <SD_MMC.h>
 #include <Update.h>
+#include <ArduinoJson.h>
 #include <freertos/semphr.h>
 #include <lwip/sockets.h>
 
@@ -689,24 +690,42 @@ static esp_err_t xiaozhi_regen_code_handler(httpd_req_t* req) {
     return httpd_resp_send(req, buf, strlen(buf));
 }
 
-// ─── XiaoZhi Agent Settings Handlers (Managed via xiaozhi.me) ─────
+// ─── XiaoZhi Runtime Protocol & Connection Settings (78/xiaozhi-esp32) ─────
 static esp_err_t xiaozhi_settings_get_handler(httpd_req_t* req) {
-    String mcpUrl = xiaozhi_get_mcp_url();
+    bool linked = xiaozhi_is_device_linked();
     bool speakerEn = xiaozhi_is_speaker_enabled();
+    String deviceId = xiaozhi_get_device_id();
+    String clientId = xiaozhi_get_client_id();
+    String otaUrl = xiaozhi_get_ota_url();
+    String wsUrl = xiaozhi_get_ws_url();
+    String wsToken = xiaozhi_get_ws_token();
+    String mqttEp = xiaozhi_get_mqtt_endpoint();
+    String mqttCid = xiaozhi_get_mqtt_client_id();
+    String mqttPub = xiaozhi_get_mqtt_publish_topic();
 
-    String json = "{";
-    json += "\"ok\":true,";
-    json += "\"name\":\"XiaoZhi AI (小智)\",";
-    json += "\"role\":\"Autonomous Vision Guardian & Assistant\",";
-    json += "\"prompt\":\"Managed centrally on https://xiaozhi.me/console/agents\",";
-    json += "\"provider\":\"cloud\",";
-    json += "\"model_name\":\"Qwen 3.6 (Cloud Managed)\",";
-    json += "\"model_id\":\"qwen-3.6\",";
-    json += "\"mcp_url\":\"" + mcpUrl + "\",";
-    json += "\"speaker_enabled\":" + String(speakerEn ? "true" : "false") + ",";
-    json += "\"github_verified\":true,";
-    json += "\"console_url\":\"https://xiaozhi.me/console/agents\"";
-    json += "}";
+    JsonDocument doc;
+    doc["ok"] = true;
+    doc["linked"] = linked;
+    doc["device_id"] = deviceId;
+    doc["client_id"] = clientId;
+    doc["ota_url"] = otaUrl;
+    doc["speaker_enabled"] = speakerEn;
+
+    if (!linked) {
+        doc["code"] = xiaozhi_get_pairing_code();
+    }
+
+    JsonObject ws = doc["websocket"].to<JsonObject>();
+    ws["url"] = wsUrl;
+    ws["token"] = wsToken;
+
+    JsonObject mqtt = doc["mqtt"].to<JsonObject>();
+    mqtt["endpoint"] = mqttEp;
+    mqtt["client_id"] = mqttCid;
+    mqtt["publish_topic"] = mqttPub;
+
+    String json;
+    serializeJson(doc, json);
 
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
@@ -726,7 +745,7 @@ static esp_err_t xiaozhi_settings_post_handler(httpd_req_t* req) {
     }
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    return httpd_resp_send(req, "{\"ok\":true,\"msg\":\"Agent settings are managed on xiaozhi.me console\"}", 63);
+    return httpd_resp_send(req, "{\"ok\":true,\"msg\":\"Agent settings managed on xiaozhi.me console\"}", 61);
 }
 
 // ─── SD card download / inline preview ────────────────────────
