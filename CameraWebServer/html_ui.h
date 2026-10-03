@@ -795,13 +795,19 @@ const char index_html[] PROGMEM = R"rawliteral(
       <div class="viewport-box" id="viewport-box">
         <div class="hud-overlay">
           <div class="live-dot" id="live-indicator"></div>
-          <span id="hud-status" style="font-weight:700;">LIVE</span>
+          <span id="hud-status" style="font-weight:700;">CONNECTING...</span>
           <span style="color:var(--text-muted);">|</span>
           <span id="hud-fps">25 FPS</span>
           <span style="color:var(--text-muted);">|</span>
           <span id="hud-rssi">📶 -- dBm</span>
         </div>
         <img id="stream-img" src="" alt="ESP32-CAM Stream">
+        <div id="sensor-offline-banner" style="display:none;position:absolute;inset:0;background:rgba(11,15,25,0.92);flex-direction:column;align-items:center;justify-content:center;padding:1rem;text-align:center;gap:0.75rem;z-index:20;">
+          <div style="font-size:1.8rem;">⚠️</div>
+          <div style="font-weight:700;color:#f87171;font-size:0.95rem;">Camera Sensor Offline</div>
+          <div style="font-size:0.78rem;color:var(--text-muted);max-width:320px;">OV2640 sensor probe failed (error 0x106). Please verify the ribbon cable is firmly seated in the FPC latch connector.</div>
+          <button class="btn btn-accent" onclick="reinitCameraSensor()">🔄 Re-detect Sensor</button>
+        </div>
       </div>
 
       <!-- Quick Action Toolbar Under Video -->
@@ -1530,27 +1536,51 @@ I have full control over camera capture, flash spotlight, SD card storage, and s
     // ─── Stream Control ─────────────────────────────────────────
     function startStream() {
       const img = document.getElementById('stream-img');
-      const host = location.hostname;
-      img.src = `${location.protocol}//${host}:81/stream?t=${Date.now()}`;
-      document.getElementById('hud-status').innerText = 'LIVE';
-      document.getElementById('stat-status').innerText = 'Streaming';
+      img.onerror = onStreamError;
+      img.onload  = onStreamLoad;
+      img.src = `/stream?t=${Date.now()}`;
+      document.getElementById('hud-status').innerText = 'CONNECTING...';
     }
 
     function onStreamError() {
       document.getElementById('live-indicator').classList.remove('active');
       document.getElementById('pill-live-dot').classList.remove('active');
-      document.getElementById('hud-status').innerText = 'Reconnecting...';
-      document.getElementById('stat-status').innerText = 'Reconnecting...';
+      document.getElementById('hud-status').innerText = 'OFFLINE';
+      document.getElementById('stat-status').innerText = 'Offline';
       document.getElementById('stream-img').src = '';
+      fetch('/api/camera/status')
+        .then(r => r.json())
+        .then(d => {
+          const banner = document.getElementById('sensor-offline-banner');
+          if (banner) banner.style.display = (!d.detected) ? 'flex' : 'none';
+        })
+        .catch(() => {});
       if (streamRetryTimer) clearTimeout(streamRetryTimer);
-      streamRetryTimer = setTimeout(startStream, 3000);
+      streamRetryTimer = setTimeout(startStream, 5000);
     }
 
     function onStreamLoad() {
+      const banner = document.getElementById('sensor-offline-banner');
+      if (banner) banner.style.display = 'none';
       document.getElementById('live-indicator').classList.add('active');
       document.getElementById('pill-live-dot').classList.add('active');
       document.getElementById('hud-status').innerText = 'LIVE';
       document.getElementById('stat-status').innerText = 'Streaming';
+    }
+
+    function reinitCameraSensor() {
+      showToast('🔄 Probing camera sensor...');
+      fetch('/api/camera/reinit')
+        .then(r => r.json())
+        .then(d => {
+          showToast(d.msg || (d.ok ? 'Camera reinitialized!' : 'Camera init failed'));
+          if (d.ok) {
+            const banner = document.getElementById('sensor-offline-banner');
+            if (banner) banner.style.display = 'none';
+            startStream();
+          }
+        })
+        .catch(() => showToast('❌ Re-init request failed'));
     }
 
     function toggleFullscreen() {
@@ -1568,9 +1598,13 @@ I have full control over camera capture, flash spotlight, SD card storage, and s
       fetch('/api/telemetry')
         .then(r => r.json())
         .then(d => {
-          document.getElementById('live-indicator').classList.add('active');
-          document.getElementById('pill-live-dot').classList.add('active');
-          document.getElementById('stat-status').innerText = 'Streaming';
+          if (d.cam_ok !== undefined && !d.cam_ok) {
+            document.getElementById('live-indicator').classList.remove('active');
+            document.getElementById('pill-live-dot').classList.remove('active');
+            document.getElementById('stat-status').innerText = 'Sensor Offline';
+            const banner = document.getElementById('sensor-offline-banner');
+            if (banner) banner.style.display = 'flex';
+          }
 
           // RSSI
           const rssiText = `📶 ${d.rssi} dBm`;

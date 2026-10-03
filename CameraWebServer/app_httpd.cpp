@@ -12,6 +12,7 @@
 #include "telegram_worker.h"
 #include "sd_manager.h"
 #include "ntp_sync.h"
+#include "camera_pins.h"
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <Preferences.h>
@@ -23,6 +24,7 @@
 // ─── External deps ────────────────────────────────────────────
 extern Preferences       preferences;
 extern SemaphoreHandle_t camera_mutex;
+extern bool              initCamera();
 int                      g_flash_pin = 4;   // GPIO4 on AI-Thinker
 int                      g_stream_fps = 25; // Default FPS
 static httpd_handle_t camera_httpd = nullptr;  // port 80 – UI + API
@@ -87,6 +89,7 @@ static esp_err_t stream_handler(httpd_req_t* req) {
     }
 
     int target_interval_ms = 1000 / (g_stream_fps > 0 ? g_stream_fps : 25);
+    int null_frames = 0;
 
     while (true) {
         uint32_t frame_start = millis();
@@ -99,9 +102,14 @@ static esp_err_t stream_handler(httpd_req_t* req) {
 
         if (!fb || fb->len == 0) {
             if (fb) esp_camera_fb_return(fb);
-            vTaskDelay(pdMS_TO_TICKS(5));
+            null_frames++;
+            if (null_frames > 30) {
+                break; // Break out if camera is offline / uninitialized
+            }
+            vTaskDelay(pdMS_TO_TICKS(40));
             continue;
         }
+        null_frames = 0;
 
         // Single combined header chunk to eliminate TCP packet fragmentation and latency
         size_t hlen = snprintf(part_buf, sizeof(part_buf),
@@ -274,6 +282,7 @@ static esp_err_t telemetry_handler(httpd_req_t* req) {
         "\"ip\":\"%s\","
         "\"mdns\":\"%s\","
         "\"sd_mounted\":%s,"
+        "\"cam_ok\":%s,"
         "\"framesize\":%d,"
         "\"fps\":%d,"
         "\"flash\":%d,"
@@ -287,6 +296,7 @@ static esp_err_t telemetry_handler(httpd_req_t* req) {
         WiFi.localIP().toString().c_str(),
         preferences.getString("mdns_name", "esp32cam").c_str(),
         sd_is_mounted() ? "true" : "false",
+        (s != nullptr) ? "true" : "false",
         fs,
         g_stream_fps,
         digitalRead(g_flash_pin),
@@ -969,6 +979,35 @@ static esp_err_t telegram_test_voice_handler(httpd_req_t* req) {
     return httpd_resp_send(req, "{\"ok\":true}", 11);
 }
 
+static esp_err_t camera_status_handler(httpd_req_t* req) {
+    sensor_t* s = esp_camera_sensor_get();
+    bool detected = (s != nullptr);
+    char buf[128];
+    snprintf(buf, sizeof(buf), "{\"ok\":true,\"detected\":%s,\"streaming\":%s,\"fps\":%d}",
+             detected ? "true" : "false",
+             g_is_streaming ? "true" : "false",
+             g_stream_fps);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    return httpd_resp_send(req, buf, strlen(buf));
+}
+
+static esp_err_t camera_reinit_handler(httpd_req_t* req) {
+    bool ok = false;
+    if (xSemaphoreTake(camera_mutex, pdMS_TO_TICKS(3000)) == pdTRUE) {
+        ok = initCamera();
+        xSemaphoreGive(camera_mutex);
+    }
+    char buf[128];
+    snprintf(buf, sizeof(buf), "{\"ok\":%s,\"detected\":%s,\"msg\":\"%s\"}",
+             ok ? "true" : "false",
+             ok ? "true" : "false",
+             ok ? "Camera reinitialized successfully!" : "Camera init failed (check OV2640 ribbon cable)");
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    return httpd_resp_send(req, buf, strlen(buf));
+}
+
 // ─── startCameraServer() ─────────────────────────────────────
 void startCameraServer() {
     g_stream_fps = preferences.getInt("cam_fps", 25);
@@ -1007,7 +1046,7 @@ void startCameraServer() {
     httpd_config_t config    = HTTPD_DEFAULT_CONFIG();
     config.server_port       = 80;
     config.ctrl_port         = 32769;   // different ctrl socket port
-    config.max_uri_handlers  = 40;
+    config.max_uri_handlers  = 45;
     config.max_open_sockets  = 4;       // 4 sockets saves ~15KB internal DRAM
     config.stack_size        = 8192;
     config.task_priority     = 4;
@@ -1023,6 +1062,7 @@ void startCameraServer() {
 
     if (httpd_start(&camera_httpd, &config) == ESP_OK) {
         reg("/",                    HTTP_GET,  index_handler);
+        reg("/stream",              HTTP_GET,  stream_handler);
         reg("/capture",             HTTP_GET,  capture_handler);
         reg("/control",             HTTP_GET,  control_handler);
         reg("/api/telemetry",       HTTP_GET,  telemetry_handler);
@@ -1030,6 +1070,9 @@ void startCameraServer() {
         reg("/api/system/config",   HTTP_POST, system_config_handler);
         reg("/api/system/flash",    HTTP_GET,  flash_handler);
         reg("/api/system/restart",  HTTP_GET,  restart_handler);
+        reg("/api/camera/status",   HTTP_GET,  camera_status_handler);
+        reg("/api/camera/reinit",   HTTP_GET,  camera_reinit_handler);
+        reg("/api/camera/reinit",   HTTP_POST, camera_reinit_handler);
         reg("/api/camera/save",     HTTP_POST, camera_save_handler);
         reg("/api/xiaozhi/chat",    HTTP_GET,  xiaozhi_chat_handler);
         reg("/api/xiaozhi/chat",    HTTP_POST, xiaozhi_chat_handler);

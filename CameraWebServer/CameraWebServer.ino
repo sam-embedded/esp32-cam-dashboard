@@ -28,15 +28,9 @@ static volatile bool  g_ap_fallback       = false;
 static volatile uint32_t g_wifi_lost_ms   = 0;
 
 // ─── Camera init ──────────────────────────────────────────────
-static bool initCamera() {
-    // Hardware power-cycle camera module on PWDN pin (GPIO32)
-    if (PWDN_GPIO_NUM != -1) {
-        pinMode(PWDN_GPIO_NUM, OUTPUT);
-        digitalWrite(PWDN_GPIO_NUM, HIGH); // Power down sensor
-        delay(30);
-        digitalWrite(PWDN_GPIO_NUM, LOW);  // Power up sensor
-        delay(30);
-    }
+bool initCamera() {
+    esp_camera_deinit();
+    vTaskDelay(pdMS_TO_TICKS(50));
 
     camera_config_t config = {};
     config.ledc_channel = LEDC_CHANNEL_0;
@@ -57,23 +51,32 @@ static bool initCamera() {
     config.pin_sccb_scl = SIOC_GPIO_NUM;
     config.pin_pwdn  = PWDN_GPIO_NUM;
     config.pin_reset = RESET_GPIO_NUM;
-    config.xclk_freq_hz = 20000000;       // 20MHz standard for OV2640 + PSRAM
     config.pixel_format = PIXFORMAT_JPEG;
-    config.grab_mode    = CAMERA_GRAB_LATEST; // Always grab the freshest frame (zero lag)
+
     if (psramFound()) {
-        config.frame_size   = FRAMESIZE_VGA;
-        config.jpeg_quality = 14;             // High speed, ~20KB per frame (smooth real-time 25fps)
-        config.fb_count     = 2;              // Double buffer in PSRAM
+        config.frame_size   = FRAMESIZE_UXGA;     // Preallocate maximum PSRAM buffer so all resolutions work
+        config.jpeg_quality = 10;
+        config.fb_count     = 2;
+        config.grab_mode    = CAMERA_GRAB_LATEST; // Zero-lag fresh frame streaming
         config.fb_location  = CAMERA_FB_IN_PSRAM;
     } else {
-        config.frame_size   = FRAMESIZE_QVGA;
-        config.jpeg_quality = 14;
+        config.frame_size   = FRAMESIZE_SVGA;
+        config.jpeg_quality = 12;
         config.fb_count     = 1;
+        config.grab_mode    = CAMERA_GRAB_WHEN_EMPTY;
         config.fb_location  = CAMERA_FB_IN_DRAM;
     }
+
+    // Try 20MHz first (standard)
+    config.xclk_freq_hz = 20000000;
     esp_err_t err = esp_camera_init(&config);
     if (err != ESP_OK) {
-        Serial.printf("[CAM] Init at 20MHz failed (0x%x), retrying at 10MHz...\n", err);
+        Serial.printf("[CAM] Init at 20MHz failed (0x%x), retrying at 16.5MHz...\n", err);
+        config.xclk_freq_hz = 16500000;
+        err = esp_camera_init(&config);
+    }
+    if (err != ESP_OK) {
+        Serial.printf("[CAM] Init at 16.5MHz failed (0x%x), retrying at 10MHz...\n", err);
         config.xclk_freq_hz = 10000000;
         err = esp_camera_init(&config);
     }
@@ -81,7 +84,8 @@ static bool initCamera() {
         Serial.printf("[CAM] Init failed: 0x%x\n", err);
         return false;
     }
-    // Sensor tweaks: Load saved defaults from NVS if available
+
+    // Drop down initial resolution to VGA for high frame rate streaming
     sensor_t* s = esp_camera_sensor_get();
     if (s) {
         int fs   = preferences.getInt("cam_framesize", FRAMESIZE_VGA);
