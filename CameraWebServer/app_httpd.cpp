@@ -245,6 +245,9 @@ static esp_err_t control_handler(httpd_req_t* req) {
     else if (!strcmp(var, "rec_interval")) {
         if (value >= 1 && value <= 120) preferences.putInt("rec_interval", value);
     }
+    else if (!strcmp(var, "tg_voice")) {
+        preferences.putBool("tg_voice", value ? true : false);
+    }
 
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     return httpd_resp_send(req, nullptr, 0);
@@ -686,58 +689,23 @@ static esp_err_t xiaozhi_regen_code_handler(httpd_req_t* req) {
     return httpd_resp_send(req, buf, strlen(buf));
 }
 
-// ─── XiaoZhi Agent Settings Handlers ─────────────────────────
+// ─── XiaoZhi Agent Settings Handlers (Managed via xiaozhi.me) ─────
 static esp_err_t xiaozhi_settings_get_handler(httpd_req_t* req) {
-    String name     = preferences.getString("xz_name",     "XiaoZhi AI (小智)");
-    String role     = preferences.getString("xz_role",     "Autonomous Vision Guardian & Assistant");
-    String prompt   = preferences.getString("xz_prompt",   "You are an autonomous AI camera guardian. Protect the premises and respond concisely.");
-    String provider = preferences.getString("xz_provider", "edge");
-    String lang     = preferences.getString("xz_lang",     "auto");
-    String apiKey   = preferences.getString("xz_key",      "");
-    String apiUrl   = preferences.getString("xz_url",      "https://api.deepseek.com/chat/completions");
-    String model    = preferences.getString("xz_model",    "deepseek-chat");
-    bool toolPhoto  = preferences.getBool("xz_t_photo",    true);
-    bool toolFlash  = preferences.getBool("xz_t_flash",    true);
-    bool toolRec    = preferences.getBool("xz_t_rec",      true);
-    bool toolTelem  = preferences.getBool("xz_t_telem",    true);
-
-    String modelId   = xiaozhi_get_model_id();
-    String modelName = xiaozhi_get_model_name();
-    String mcpUrl    = xiaozhi_get_mcp_url();
-    bool speakerEn   = xiaozhi_is_speaker_enabled();
-
-    auto esc = [](const String& in) {
-        String out = "";
-        for (size_t i = 0; i < in.length(); i++) {
-            char c = in[i];
-            if (c == '"') out += "\\\"";
-            else if (c == '\\') out += "\\\\";
-            else if (c == '\n') out += "\\n";
-            else if (c == '\r') continue;
-            else out += c;
-        }
-        return out;
-    };
+    String mcpUrl = xiaozhi_get_mcp_url();
+    bool speakerEn = xiaozhi_is_speaker_enabled();
 
     String json = "{";
     json += "\"ok\":true,";
-    json += "\"name\":\"" + esc(name) + "\",";
-    json += "\"role\":\"" + esc(role) + "\",";
-    json += "\"prompt\":\"" + esc(prompt) + "\",";
-    json += "\"provider\":\"" + esc(provider) + "\",";
-    json += "\"lang\":\"" + esc(lang) + "\",";
-    json += "\"api_key\":\"" + esc(apiKey) + "\",";
-    json += "\"api_url\":\"" + esc(apiUrl) + "\",";
-    json += "\"model\":\"" + esc(model) + "\",";
-    json += "\"model_id\":\"" + esc(modelId) + "\",";
-    json += "\"model_name\":\"" + esc(modelName) + "\",";
-    json += "\"mcp_url\":\"" + esc(mcpUrl) + "\",";
+    json += "\"name\":\"XiaoZhi AI (小智)\",";
+    json += "\"role\":\"Autonomous Vision Guardian & Assistant\",";
+    json += "\"prompt\":\"Managed centrally on https://xiaozhi.me/console/agents\",";
+    json += "\"provider\":\"cloud\",";
+    json += "\"model_name\":\"Qwen 3.6 (Cloud Managed)\",";
+    json += "\"model_id\":\"qwen-3.6\",";
+    json += "\"mcp_url\":\"" + mcpUrl + "\",";
     json += "\"speaker_enabled\":" + String(speakerEn ? "true" : "false") + ",";
     json += "\"github_verified\":true,";
-    json += "\"tool_photo\":" + String(toolPhoto ? "true" : "false") + ",";
-    json += "\"tool_flash\":" + String(toolFlash ? "true" : "false") + ",";
-    json += "\"tool_rec\":" + String(toolRec ? "true" : "false") + ",";
-    json += "\"tool_telem\":" + String(toolTelem ? "true" : "false");
+    json += "\"console_url\":\"https://xiaozhi.me/console/agents\"";
     json += "}";
 
     httpd_resp_set_type(req, "application/json");
@@ -746,65 +714,19 @@ static esp_err_t xiaozhi_settings_get_handler(httpd_req_t* req) {
 }
 
 static esp_err_t xiaozhi_settings_post_handler(httpd_req_t* req) {
-    char body[1024] = {};
+    char body[512] = {};
     int received = httpd_req_recv(req, body, sizeof(body) - 1);
-    if (received <= 0) { httpd_resp_send_500(req); return ESP_FAIL; }
-    body[received] = 0;
-
-    auto getParam = [&](const char* key, char* out, size_t outLen) {
-        char search[64];
-        snprintf(search, sizeof(search), "%s=", key);
-        char* p = strstr(body, search);
-        if (!p) { out[0] = 0; return; }
-        p += strlen(search);
-        char* end = strchr(p, '&');
-        size_t len = end ? (size_t)(end - p) : strlen(p);
-        if (len >= outLen) len = outLen - 1;
-        strncpy(out, p, len);
-        out[len] = 0;
-    };
-
-    char name[64] = {}, role[96] = {}, prompt[384] = {}, prov[32] = {}, lang[32] = {};
-    char key[128] = {}, url[128] = {}, model[64] = {};
-    char modelId[32] = {}, mcpUrl[384] = {}, spkEn[8] = {};
-    char tPhoto[8] = {}, tFlash[8] = {}, tRec[8] = {}, tTelem[8] = {};
-
-    getParam("name", name, sizeof(name));
-    getParam("role", role, sizeof(role));
-    getParam("prompt", prompt, sizeof(prompt));
-    getParam("provider", prov, sizeof(prov));
-    getParam("lang", lang, sizeof(lang));
-    getParam("api_key", key, sizeof(key));
-    getParam("api_url", url, sizeof(url));
-    getParam("model", model, sizeof(model));
-    getParam("model_id", modelId, sizeof(modelId));
-    getParam("mcp_url", mcpUrl, sizeof(mcpUrl));
-    getParam("speaker_enabled", spkEn, sizeof(spkEn));
-    getParam("tool_photo", tPhoto, sizeof(tPhoto));
-    getParam("tool_flash", tFlash, sizeof(tFlash));
-    getParam("tool_rec", tRec, sizeof(tRec));
-    getParam("tool_telem", tTelem, sizeof(tTelem));
-
-    if (name[0])    preferences.putString("xz_name", urlDecode(name));
-    if (role[0])    preferences.putString("xz_role", urlDecode(role));
-    if (prompt[0])  preferences.putString("xz_prompt", urlDecode(prompt));
-    if (prov[0])    preferences.putString("xz_provider", urlDecode(prov));
-    if (lang[0])    preferences.putString("xz_lang", urlDecode(lang));
-    if (key[0])     preferences.putString("xz_key", urlDecode(key));
-    if (url[0])     preferences.putString("xz_url", urlDecode(url));
-    if (model[0])   preferences.putString("xz_model", urlDecode(model));
-    if (modelId[0]) xiaozhi_set_model(modelId);
-    if (mcpUrl[0])  xiaozhi_set_mcp_url(urlDecode(mcpUrl));
-    if (spkEn[0])   xiaozhi_set_speaker_enabled(atoi(spkEn) != 0);
-
-    if (tPhoto[0]) preferences.putBool("xz_t_photo", atoi(tPhoto) != 0);
-    if (tFlash[0]) preferences.putBool("xz_t_flash", atoi(tFlash) != 0);
-    if (tRec[0])   preferences.putBool("xz_t_rec", atoi(tRec) != 0);
-    if (tTelem[0]) preferences.putBool("xz_t_telem", atoi(tTelem) != 0);
-
+    if (received > 0) {
+        body[received] = 0;
+        char* p = strstr(body, "speaker_enabled=");
+        if (p) {
+            bool spk = (p[16] == '1');
+            xiaozhi_set_speaker_enabled(spk);
+        }
+    }
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    return httpd_resp_send(req, "{\"ok\":true}", 11);
+    return httpd_resp_send(req, "{\"ok\":true,\"msg\":\"Agent settings are managed on xiaozhi.me console\"}", 63);
 }
 
 // ─── SD card download / inline preview ────────────────────────
