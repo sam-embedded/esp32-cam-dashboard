@@ -29,6 +29,15 @@ static volatile uint32_t g_wifi_lost_ms   = 0;
 
 // ─── Camera init ──────────────────────────────────────────────
 static bool initCamera() {
+    // Hardware power-cycle camera module on PWDN pin (GPIO32)
+    if (PWDN_GPIO_NUM != -1) {
+        pinMode(PWDN_GPIO_NUM, OUTPUT);
+        digitalWrite(PWDN_GPIO_NUM, HIGH); // Power down sensor
+        delay(30);
+        digitalWrite(PWDN_GPIO_NUM, LOW);  // Power up sensor
+        delay(30);
+    }
+
     camera_config_t config = {};
     config.ledc_channel = LEDC_CHANNEL_0;
     config.ledc_timer   = LEDC_TIMER_0;
@@ -63,6 +72,11 @@ static bool initCamera() {
         config.fb_location  = CAMERA_FB_IN_DRAM;
     }
     esp_err_t err = esp_camera_init(&config);
+    if (err != ESP_OK) {
+        Serial.printf("[CAM] Init at 20MHz failed (0x%x), retrying at 10MHz...\n", err);
+        config.xclk_freq_hz = 10000000;
+        err = esp_camera_init(&config);
+    }
     if (err != ESP_OK) {
         Serial.printf("[CAM] Init failed: 0x%x\n", err);
         return false;
@@ -386,9 +400,7 @@ void setup() {
 
     // Camera
     if (!initCamera()) {
-        Serial.println("[BOOT] Camera failed – auto-restarting in 3s");
-        delay(3000);
-        esp_restart();
+        Serial.println("[BOOT] Camera probe failed – continuing in headless/AI mode (WiFi, Telegram, AI active)");
     }
 
     // Pre-configure DNS override so lwIP has 8.8.8.8 and 1.1.1.1 immediately

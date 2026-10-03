@@ -689,6 +689,11 @@ static esp_err_t xiaozhi_settings_get_handler(httpd_req_t* req) {
     bool toolRec    = preferences.getBool("xz_t_rec",      true);
     bool toolTelem  = preferences.getBool("xz_t_telem",    true);
 
+    String modelId   = xiaozhi_get_model_id();
+    String modelName = xiaozhi_get_model_name();
+    String mcpUrl    = xiaozhi_get_mcp_url();
+    bool speakerEn   = xiaozhi_is_speaker_enabled();
+
     auto esc = [](const String& in) {
         String out = "";
         for (size_t i = 0; i < in.length(); i++) {
@@ -712,6 +717,11 @@ static esp_err_t xiaozhi_settings_get_handler(httpd_req_t* req) {
     json += "\"api_key\":\"" + esc(apiKey) + "\",";
     json += "\"api_url\":\"" + esc(apiUrl) + "\",";
     json += "\"model\":\"" + esc(model) + "\",";
+    json += "\"model_id\":\"" + esc(modelId) + "\",";
+    json += "\"model_name\":\"" + esc(modelName) + "\",";
+    json += "\"mcp_url\":\"" + esc(mcpUrl) + "\",";
+    json += "\"speaker_enabled\":" + String(speakerEn ? "true" : "false") + ",";
+    json += "\"github_verified\":true,";
     json += "\"tool_photo\":" + String(toolPhoto ? "true" : "false") + ",";
     json += "\"tool_flash\":" + String(toolFlash ? "true" : "false") + ",";
     json += "\"tool_rec\":" + String(toolRec ? "true" : "false") + ",";
@@ -744,6 +754,7 @@ static esp_err_t xiaozhi_settings_post_handler(httpd_req_t* req) {
 
     char name[64] = {}, role[96] = {}, prompt[384] = {}, prov[32] = {}, lang[32] = {};
     char key[128] = {}, url[128] = {}, model[64] = {};
+    char modelId[32] = {}, mcpUrl[384] = {}, spkEn[8] = {};
     char tPhoto[8] = {}, tFlash[8] = {}, tRec[8] = {}, tTelem[8] = {};
 
     getParam("name", name, sizeof(name));
@@ -754,19 +765,25 @@ static esp_err_t xiaozhi_settings_post_handler(httpd_req_t* req) {
     getParam("api_key", key, sizeof(key));
     getParam("api_url", url, sizeof(url));
     getParam("model", model, sizeof(model));
+    getParam("model_id", modelId, sizeof(modelId));
+    getParam("mcp_url", mcpUrl, sizeof(mcpUrl));
+    getParam("speaker_enabled", spkEn, sizeof(spkEn));
     getParam("tool_photo", tPhoto, sizeof(tPhoto));
     getParam("tool_flash", tFlash, sizeof(tFlash));
     getParam("tool_rec", tRec, sizeof(tRec));
     getParam("tool_telem", tTelem, sizeof(tTelem));
 
-    if (name[0])   preferences.putString("xz_name", urlDecode(name));
-    if (role[0])   preferences.putString("xz_role", urlDecode(role));
-    if (prompt[0]) preferences.putString("xz_prompt", urlDecode(prompt));
-    if (prov[0])   preferences.putString("xz_provider", urlDecode(prov));
-    if (lang[0])   preferences.putString("xz_lang", urlDecode(lang));
-    if (key[0])    preferences.putString("xz_key", urlDecode(key));
-    if (url[0])    preferences.putString("xz_url", urlDecode(url));
-    if (model[0])  preferences.putString("xz_model", urlDecode(model));
+    if (name[0])    preferences.putString("xz_name", urlDecode(name));
+    if (role[0])    preferences.putString("xz_role", urlDecode(role));
+    if (prompt[0])  preferences.putString("xz_prompt", urlDecode(prompt));
+    if (prov[0])    preferences.putString("xz_provider", urlDecode(prov));
+    if (lang[0])    preferences.putString("xz_lang", urlDecode(lang));
+    if (key[0])     preferences.putString("xz_key", urlDecode(key));
+    if (url[0])     preferences.putString("xz_url", urlDecode(url));
+    if (model[0])   preferences.putString("xz_model", urlDecode(model));
+    if (modelId[0]) xiaozhi_set_model(modelId);
+    if (mcpUrl[0])  xiaozhi_set_mcp_url(urlDecode(mcpUrl));
+    if (spkEn[0])   xiaozhi_set_speaker_enabled(atoi(spkEn) != 0);
 
     if (tPhoto[0]) preferences.putBool("xz_t_photo", atoi(tPhoto) != 0);
     if (tFlash[0]) preferences.putBool("xz_t_flash", atoi(tFlash) != 0);

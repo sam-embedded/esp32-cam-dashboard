@@ -37,4 +37,11 @@ bool   xiaozhi_verify_code(const String& input_code, const String& chat_id);
 void   xiaozhi_announce_code(bool send_voice = true);
 bool   xiaozhi_cloud_fetch_code();
 bool   xiaozhi_cloud_poll_activate();
+String xiaozhi_get_model_id();
+String xiaozhi_get_model_name();
+bool   xiaozhi_set_model(const String& input);
+String xiaozhi_get_mcp_url();
+void   xiaozhi_set_mcp_url(const String& url);
+bool   xiaozhi_is_speaker_enabled();
+void   xiaozhi_set_speaker_enabled(bool enabled);
 void TaskTelegram(void* pvParameters);     // FreeRTOS task entry
