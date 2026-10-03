@@ -454,6 +454,10 @@ bool xiaozhi_verify_code(const String& input_code, const String& chat_id) {
                 preferences.putString("tg_chat_id", allChats);
             }
         }
+        // Invalidate single-use pairing code to prevent looping on duplicate delivery
+        uint32_t num = 100000 + (esp_random() % 900000);
+        s_xiaozhi_code = String(num);
+        preferences.putString("xz_code", s_xiaozhi_code);
         return true;
     }
     return false;
@@ -679,6 +683,11 @@ String xiaozhi_ai_chat(const String& prompt) {
 // ─── Command Processor for Incoming Telegram Messages ────────
 static void handleNewMessages(int numNewMessages) {
     for (int i = 0; i < numNewMessages; i++) {
+        // Guarantee update offset advances
+        if (g_bot->messages[i].update_id > g_bot->last_message_received) {
+            g_bot->last_message_received = g_bot->messages[i].update_id;
+        }
+
         String chat_id = g_bot->messages[i].chat_id;
         String text    = g_bot->messages[i].text;
         String type    = g_bot->messages[i].type;
@@ -698,7 +707,12 @@ static void handleNewMessages(int numNewMessages) {
         }
 
         if (!bindArg.isEmpty()) {
-            if (xiaozhi_verify_code(bindArg, chat_id)) {
+            if (isChatAuthorized(chat_id) && xiaozhi_is_device_linked()) {
+                String reply = "✅ *Device is already linked and authorized!*\n"
+                               "Your Telegram Chat ID (`" + chat_id + "`) has full control.\n"
+                               "Type `help` or send voice commands anytime!";
+                g_bot->sendMessage(chat_id, reply, "Markdown");
+            } else if (xiaozhi_verify_code(bindArg, chat_id)) {
                 String reply = "🎉 *XiaoZhi AI Device Successfully Linked!*\n"
                                "━━━━━━━━━━━━━━━━━━━━\n"
                                "✅ Your Telegram Chat ID (`" + chat_id + "`) has been verified and permanently authorized.\n"
@@ -814,6 +828,7 @@ void TaskTelegram(void* pvParameters) {
     parseChatIds(chats);
 
     g_bot = new UniversalTelegramBot(tg_token, g_tg_client);
+    g_bot->last_message_received = 0;
     g_bot->waitForResponse = 3500; // 3.5s timeout for mobile hotspots
 
     g_tg_ready = true;
@@ -879,16 +894,13 @@ void TaskTelegram(void* pvParameters) {
             if (WiFi.status() == WL_CONNECTED && !tg_token.isEmpty()) {
                 int numNew = g_bot->getUpdates(g_bot->last_message_received + 1);
                 if (numNew > 0) {
-                    pollInterval = 5000;
-                    while (numNew) {
-                        handleNewMessages(numNew);
-                        numNew = g_bot->getUpdates(g_bot->last_message_received + 1);
-                    }
+                    pollInterval = 3000;
+                    handleNewMessages(numNew);
                 } else if (numNew < 0) {
-                    // Back off to 20s on network error
-                    pollInterval = 20000;
+                    // Back off to 15s on network error
+                    pollInterval = 15000;
                 } else {
-                    pollInterval = 10000;
+                    pollInterval = 4000;
                 }
             }
         }
