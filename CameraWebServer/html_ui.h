@@ -1089,7 +1089,7 @@ const char index_html[] PROGMEM = R"rawliteral(
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.4rem;">
               <button class="btn btn-accent" onclick="announcePairingCode()" title="Broadcast code to Telegram Bot via text and voice note">📢 Announce</button>
               <button class="btn" onclick="regenPairingCode()" title="Generate fresh 6-digit code">🔄 New Code</button>
-              <a class="btn" href="https://xiaozhi.me" target="_blank" style="text-decoration:none;display:flex;align-items:center;justify-content:center;" title="Open xiaozhi.me console">🔗 xiaozhi.me</a>
+              <a class="btn" href="https://xiaozhi.me/console/agents" target="_blank" style="text-decoration:none;display:flex;align-items:center;justify-content:center;" title="Open xiaozhi.me console to add device">🔗 xiaozhi.me</a>
             </div>
           </div>
         </div>
@@ -2011,20 +2011,30 @@ I have full control over camera capture, flash spotlight, SD card storage, and s
 
     // ─── XiaoZhi Pairing & Verification Code ────────────────────
     function updateCodeUI(code, linked) {
-      if (code) {
-        const cd = document.getElementById('xz-code-display');
-        const ci = document.getElementById('xz-code-inline');
-        if (cd) cd.innerText = code;
-        if (ci) ci.innerText = code;
-      }
+      const cd = document.getElementById('xz-code-display');
+      const ci = document.getElementById('xz-code-inline');
       const b = document.getElementById('xz-link-badge');
-      if (b) {
-        if (linked) {
-          b.innerText = 'Linked';
+      if (linked) {
+        if (cd) {
+          cd.innerText = 'LINKED ✅';
+          cd.style.color = '#4ade80';
+          cd.style.textShadow = '0 0 15px rgba(74,222,128,0.5)';
+        }
+        if (ci) ci.innerText = 'LINKED';
+        if (b) {
+          b.innerText = 'Linked on xiaozhi.me ✅';
           b.style.background = 'rgba(34,197,94,0.2)';
           b.style.color = '#4ade80';
-        } else {
-          b.innerText = 'Unlinked';
+        }
+      } else {
+        if (code && cd) {
+          cd.innerText = code;
+          cd.style.color = '#38bdf8';
+          cd.style.textShadow = '0 0 15px rgba(56,189,248,0.5)';
+        }
+        if (code && ci) ci.innerText = code;
+        if (b) {
+          b.innerText = 'Unlinked ⚠️';
           b.style.background = 'rgba(234,179,8,0.2)';
           b.style.color = '#facc15';
         }

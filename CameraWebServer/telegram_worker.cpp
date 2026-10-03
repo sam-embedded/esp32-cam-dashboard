@@ -9,6 +9,7 @@
 #include "telegram_worker.h"
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
+#include <HTTPClient.h>
 #include <UniversalTelegramBot.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
@@ -65,7 +66,14 @@ public:
             if (ret > 0) return ret;
         }
 
-        // 3. Fallback: Direct Telegram core IPv4 endpoints if DNS is down/blocked
+        // 3. Fallback: Direct Tenclass / XiaoZhi cloud IPv4 endpoint if DNS is down/blocked
+        if (strstr(host, "tenclass") != nullptr) {
+            IPAddress tip(47, 76, 65, 170);
+            int ret = WiFiClientSecure::connect(tip, port, host, nullptr, nullptr, nullptr);
+            if (ret > 0) return ret;
+        }
+
+        // 4. Fallback: Direct Telegram core IPv4 endpoints if DNS is down/blocked
         static const IPAddress TG_IPV4[] = {
             IPAddress(149, 154, 167, 220),
             IPAddress(149, 154, 166, 110),
@@ -406,25 +414,143 @@ String xiaozhi_format_digits_spoken(const String& code) {
     return spoken;
 }
 
+// ─── Official XiaoZhi Cloud Client (api.tenclass.net) ─────────
+bool xiaozhi_cloud_fetch_code() {
+    if (WiFi.status() != WL_CONNECTED) return false;
+
+    String client_uuid = preferences.getString("xz_uuid", "0248512d-c252-4a16-8298-14b223af6cdd");
+    if (preferences.getString("xz_uuid", "").isEmpty()) {
+        preferences.putString("xz_uuid", client_uuid);
+    }
+
+    String mac = WiFi.macAddress();
+    mac.toLowerCase();
+
+    TelegramClient client;
+    client.setInsecure();
+    client.setTimeout(8000);
+
+    HTTPClient http;
+    if (!http.begin(client, "https://api.tenclass.net/xiaozhi/ota/")) {
+        return false;
+    }
+
+    http.setUserAgent("bread-compact-wifi/1.0.0");
+    http.addHeader("Activation-Version", "1");
+    http.addHeader("Device-Id", mac);
+    http.addHeader("Client-Id", client_uuid);
+    http.addHeader("Accept-Language", "zh-CN");
+    http.addHeader("Content-Type", "application/json");
+
+    String payload = "{\"version\":2,\"language\":\"zh-CN\",\"flash_size\":4194304,\"minimum_free_heap_size\":\"200000\","
+                     "\"mac_address\":\"" + mac + "\",\"uuid\":\"" + client_uuid + "\",\"chip_model_name\":\"esp32\","
+                     "\"chip_info\":{\"model\":1,\"cores\":2,\"revision\":1,\"features\":0},"
+                     "\"application\":{\"name\":\"xiaozhi\",\"version\":\"1.0.0\"},"
+                     "\"partition_table\":[{\"label\":\"app\",\"type\":1,\"subtype\":2,\"address\":65536,\"size\":3145728}],"
+                     "\"ota\":{\"label\":\"app\"}}";
+
+    int code = http.POST(payload);
+    Serial.printf("[XIAOZHI] Cloud fetch HTTP code: %d\n", code);
+    if (code == 200) {
+        String resp = http.getString();
+        Serial.printf("[XIAOZHI] Cloud Response: %s\n", resp.c_str());
+        JsonDocument doc;
+        DeserializationError err = deserializeJson(doc, resp);
+        if (!err) {
+            if (!doc["activation"].isNull() && !doc["activation"]["code"].isNull()) {
+                String actCode = doc["activation"]["code"].as<String>();
+                String challenge = doc["activation"]["challenge"].as<String>();
+                if (actCode.length() == 6) {
+                    s_xiaozhi_code = actCode;
+                    preferences.putString("xz_code", s_xiaozhi_code);
+                    preferences.putString("xz_challenge", challenge);
+                    preferences.putBool("xz_linked", false);
+                    Serial.printf("[XIAOZHI] Cloud code received: %s (unlinked)\n", s_xiaozhi_code.c_str());
+                    http.end();
+                    return true;
+                }
+            } else if (!doc["mqtt"].isNull() || !doc["websocket"].isNull()) {
+                // If it returned MQTT/Websocket and NO activation, device is officially bound on xiaozhi.me!
+                preferences.putBool("xz_linked", true);
+                preferences.remove("xz_code");
+                preferences.remove("xz_challenge");
+                Serial.println("[XIAOZHI] Device confirmed officially linked on xiaozhi.me!");
+                http.end();
+                return true;
+            }
+        } else {
+            Serial.printf("[XIAOZHI] JSON parse error: %s\n", err.c_str());
+        }
+    }
+    http.end();
+    return false;
+}
+
+bool xiaozhi_cloud_poll_activate() {
+    if (WiFi.status() != WL_CONNECTED) return false;
+    String client_uuid = preferences.getString("xz_uuid", "0248512d-c252-4a16-8298-14b223af6cdd");
+    String mac = WiFi.macAddress();
+    mac.toLowerCase();
+
+    TelegramClient client;
+    client.setInsecure();
+    client.setTimeout(6000);
+
+    HTTPClient http;
+    if (!http.begin(client, "https://api.tenclass.net/xiaozhi/ota/activate")) {
+        return false;
+    }
+
+    http.setUserAgent("bread-compact-wifi/1.0.0");
+    http.addHeader("Activation-Version", "1");
+    http.addHeader("Device-Id", mac);
+    http.addHeader("Client-Id", client_uuid);
+    http.addHeader("Accept-Language", "zh-CN");
+    http.addHeader("Content-Type", "application/json");
+
+    String challenge = preferences.getString("xz_challenge", "");
+    String payload = challenge.isEmpty() ? "{}" : ("{\"challenge\":\"" + challenge + "\"}");
+
+    int code = http.POST(payload);
+    http.end();
+
+    if (code == 200) {
+        // Officially activated on xiaozhi.me!
+        preferences.putBool("xz_linked", true);
+        preferences.putString("xz_challenge", "");
+        return true;
+    }
+    return false;
+}
+
 String xiaozhi_get_pairing_code() {
     if (s_xiaozhi_code.length() == 6) return s_xiaozhi_code;
     String saved = preferences.getString("xz_code", "");
+    if (saved.length() == 6 && !xiaozhi_is_device_linked()) {
+        s_xiaozhi_code = saved;
+        return s_xiaozhi_code;
+    }
+    // Attempt official cloud code fetch first
+    if (xiaozhi_cloud_fetch_code()) {
+        return s_xiaozhi_code;
+    }
     if (saved.length() == 6) {
         s_xiaozhi_code = saved;
         return s_xiaozhi_code;
     }
-    uint32_t num = 100000 + (esp_random() % 900000);
-    s_xiaozhi_code = String(num);
-    preferences.putString("xz_code", s_xiaozhi_code);
-    return s_xiaozhi_code;
+    return "------";
 }
 
 String xiaozhi_regen_code() {
-    uint32_t num = 100000 + (esp_random() % 900000);
-    s_xiaozhi_code = String(num);
-    preferences.putString("xz_code", s_xiaozhi_code);
     preferences.putBool("xz_linked", false);
-    return s_xiaozhi_code;
+    preferences.remove("xz_code");
+    preferences.remove("xz_challenge");
+    s_xiaozhi_code = "";
+    // Attempt official cloud code fetch
+    if (xiaozhi_cloud_fetch_code()) {
+        return s_xiaozhi_code;
+    }
+    return preferences.getString("xz_code", "------");
 }
 
 bool xiaozhi_is_device_linked() {
@@ -439,8 +565,7 @@ bool xiaozhi_verify_code(const String& input_code, const String& chat_id) {
     String cleanInput = input_code;
     cleanInput.trim();
     String current = xiaozhi_get_pairing_code();
-    if (cleanInput == current) {
-        preferences.putBool("xz_linked", true);
+    if (cleanInput.length() == 6 && cleanInput == current) {
         if (!chat_id.isEmpty()) {
             bool found = false;
             for (const auto& id : tg_chat_ids) {
@@ -454,42 +579,49 @@ bool xiaozhi_verify_code(const String& input_code, const String& chat_id) {
                 preferences.putString("tg_chat_id", allChats);
             }
         }
-        // Invalidate single-use pairing code to prevent looping on duplicate delivery
-        uint32_t num = 100000 + (esp_random() % 900000);
-        s_xiaozhi_code = String(num);
-        preferences.putString("xz_code", s_xiaozhi_code);
         return true;
     }
     return false;
 }
 
 void xiaozhi_announce_code(bool send_voice) {
-    String code = xiaozhi_get_pairing_code();
     bool linked = xiaozhi_is_device_linked();
-    String spokenDigits = xiaozhi_format_digits_spoken(code);
+    String code = linked ? "ONLINE" : xiaozhi_get_pairing_code();
+    String spokenDigits = linked ? "" : xiaozhi_format_digits_spoken(code);
 
     char msg[600];
-    snprintf(msg, sizeof(msg),
-        "✨ *XiaoZhi AI (小智) %s Device*\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "🔑 *6-Digit Verification Code:* `%s`\n"
-        "🌐 *Device:* `esp32cam.local` | IP: `%s`\n"
-        "📡 *Status:* %s\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "👉 *To Link:* Enter `%s` on [xiaozhi.me](https://xiaozhi.me) or reply `/bind %s` to this bot!",
-        linked ? "Online" : "Unlinked",
-        code.c_str(),
-        WiFi.localIP().toString().c_str(),
-        linked ? "Device Linked ✅" : "Unlinked / Pairing Required ⚠️",
-        code.c_str(), code.c_str()
-    );
+    if (linked) {
+        snprintf(msg, sizeof(msg),
+            "✨ *XiaoZhi AI (小智) Online Device*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📡 *Status:* Device Linked on xiaozhi.me ✅\n"
+            "🌐 *Device:* `esp32cam.local` | IP: `%s`\n"
+            "🤖 *Cloud Agent:* Connected & Active\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "Ready for commands! Type `help`, take a photo, or send voice messages.",
+            WiFi.localIP().toString().c_str()
+        );
+    } else {
+        snprintf(msg, sizeof(msg),
+            "✨ *XiaoZhi AI (小智) Unlinked Device*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🔑 *6-Digit Verification Code:* `%s`\n"
+            "🌐 *Device:* `esp32cam.local` | IP: `%s`\n"
+            "📡 *Status:* Unlinked / Pairing Required ⚠️\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "👉 *To Link:* Enter `%s` on [xiaozhi.me/console/agents](https://xiaozhi.me/console/agents) or reply `/bind %s` to this bot!",
+            code.c_str(),
+            WiFi.localIP().toString().c_str(),
+            code.c_str(), code.c_str()
+        );
+    }
 
     telegram_send_message(msg);
 
     if (send_voice) {
         String voiceText = linked ?
-            ("XiaoZhi AI online. Device is linked. Verification code is " + spokenDigits + ".") :
-            ("XiaoZhi AI online. Unlinked device verification code is " + spokenDigits + ". Please bind your device.");
+            "XiaoZhi AI online. Device is linked and active on XiaoZhi dot me console." :
+            ("XiaoZhi AI online. Unlinked device verification code is " + spokenDigits + ". Please bind your device on XiaoZhi dot me.");
         telegram_send_voice(voiceText.c_str());
     }
 }
@@ -512,11 +644,17 @@ String xiaozhi_ai_chat(const String& prompt) {
     // 0. Verification Pairing Code query
     if (lower == "code" || lower.indexOf("verification") >= 0 || lower.indexOf("pair") >= 0 ||
         lower.indexOf("bind") >= 0 || lower.indexOf("验证码") >= 0 || lower.indexOf("配对") >= 0) {
-        String c = xiaozhi_get_pairing_code();
         bool linked = xiaozhi_is_device_linked();
+        if (linked) {
+            return "🎉 *" + agentName + " is Linked & Active!*\n"
+                   "Status: Device Linked on xiaozhi.me ✅\n"
+                   "🌐 Device: `esp32cam.local` | IP: `" + WiFi.localIP().toString() + "`\n\n"
+                   "Your device is connected to XiaoZhi Cloud AI with full Telegram and Web UI control. Type `help` or send voice commands anytime!";
+        }
+        String c = xiaozhi_get_pairing_code();
         return "🔑 *" + agentName + " 6-Digit Pairing Code:* `" + c + "`\n"
-               "Status: " + (linked ? "Device Linked ✅" : "Unlinked / Ready to Pair ⚠️") + "\n\n"
-               "Enter this code on [xiaozhi.me](https://xiaozhi.me) or reply `/bind " + c + "` to authorize your Telegram account!";
+               "Status: Unlinked / Ready to Pair ⚠️\n\n"
+               "Enter this code on [xiaozhi.me/console/agents](https://xiaozhi.me/console/agents) to pair with XiaoZhi Cloud, or reply `/bind " + c + "` to authorize your Telegram account!";
     }
 
     // 1. Photo / Capture
@@ -710,6 +848,18 @@ static void handleNewMessages(int numNewMessages) {
         String lower = text;
         lower.toLowerCase();
 
+        // ── Check for unbind / reset command ──
+        if (lower == "/unbind" || lower == "unbind" || lower == "/reset_xz") {
+            String code = xiaozhi_regen_code();
+            String reply = "🔄 *XiaoZhi AI Unbound & Reset!*\n"
+                           "Official cloud verification code refreshed:\n"
+                           "🔑 Code: `" + code + "`\n\n"
+                           "Enter this code on [xiaozhi.me/console/agents](https://xiaozhi.me/console/agents) to pair your device.";
+            g_bot->sendMessage(chat_id, reply, "Markdown");
+            xiaozhi_announce_code(true);
+            continue;
+        }
+
         // ── Check for 6-Digit Device Pairing (/bind 123456 or 123456) ──
         String bindArg = "";
         if (lower.startsWith("/bind")) {
@@ -727,12 +877,13 @@ static void handleNewMessages(int numNewMessages) {
                                "Type `help` or send voice commands anytime!";
                 g_bot->sendMessage(chat_id, reply, "Markdown");
             } else if (xiaozhi_verify_code(bindArg, chat_id)) {
-                String reply = "🎉 *XiaoZhi AI Device Successfully Linked!*\n"
+                String reply = "🎉 *Telegram Chat Authorized!*\n"
                                "━━━━━━━━━━━━━━━━━━━━\n"
-                               "✅ Your Telegram Chat ID (`" + chat_id + "`) has been verified and permanently authorized.\n"
-                               "🤖 You now have full voice and text control over this camera device!";
+                               "✅ Your Telegram Chat ID (`" + chat_id + "`) is verified and authorized.\n"
+                               "🤖 You have full voice and text control over this camera device!\n\n"
+                               "👉 To pair this camera with XiaoZhi Cloud AI, enter `" + bindArg + "` on [xiaozhi.me/console/agents](https://xiaozhi.me/console/agents).";
                 g_bot->sendMessage(chat_id, reply, "Markdown");
-                telegram_send_voice_direct(chat_id, "Device successfully linked. Welcome to XiaoZhi AI!", "🎉 Linked");
+                telegram_send_voice_direct(chat_id, "Telegram chat authorized. Welcome to XiaoZhi AI!", "🎉 Linked");
             } else {
                 String reply = "❌ *Invalid Verification Code!*\n"
                                "Please check the 6-digit verification code announced by the device or visible in your Web Dashboard.";
@@ -929,6 +1080,21 @@ void TaskTelegram(void* pvParameters) {
             if (newToken != tg_token) {
                 tg_token = newToken;
                 g_bot->updateToken(tg_token);
+            }
+        }
+
+        // ── 4. XiaoZhi Official Cloud Poller (when unlinked) ──
+        static uint32_t lastXzPoll = 0;
+        if (!xiaozhi_is_device_linked() && millis() - lastXzPoll > 15000) {
+            lastXzPoll = millis();
+            if (WiFi.status() == WL_CONNECTED) {
+                bool wasLinked = xiaozhi_is_device_linked();
+                if (xiaozhi_cloud_fetch_code()) {
+                    if (!wasLinked && xiaozhi_is_device_linked()) {
+                        telegram_send_message("🎉 *XiaoZhi AI Device Bound on xiaozhi.me!*\nOfficial cloud activation confirmed by Tenclass servers!");
+                        telegram_send_voice("Device successfully linked on XiaoZhi dot me console!");
+                    }
+                }
             }
         }
 

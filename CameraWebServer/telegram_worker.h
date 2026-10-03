@@ -35,4 +35,6 @@ bool   xiaozhi_is_device_linked();
 void   xiaozhi_set_device_linked(bool linked);
 bool   xiaozhi_verify_code(const String& input_code, const String& chat_id);
 void   xiaozhi_announce_code(bool send_voice = true);
+bool   xiaozhi_cloud_fetch_code();
+bool   xiaozhi_cloud_poll_activate();
 void TaskTelegram(void* pvParameters);     // FreeRTOS task entry

@@ -642,8 +642,8 @@ static esp_err_t xiaozhi_chat_handler(httpd_req_t* req) {
 
 // ─── XiaoZhi Code & Announce Handlers ─────────────────────────
 static esp_err_t xiaozhi_code_handler(httpd_req_t* req) {
-    String code = xiaozhi_get_pairing_code();
     bool linked = xiaozhi_is_device_linked();
+    String code = linked ? "ONLINE" : xiaozhi_get_pairing_code();
     char buf[128];
     snprintf(buf, sizeof(buf), "{\"ok\":true,\"code\":\"%s\",\"linked\":%s}",
              code.c_str(), linked ? "true" : "false");
@@ -654,8 +654,8 @@ static esp_err_t xiaozhi_code_handler(httpd_req_t* req) {
 
 static esp_err_t xiaozhi_announce_handler(httpd_req_t* req) {
     xiaozhi_announce_code(true);
-    String code = xiaozhi_get_pairing_code();
     bool linked = xiaozhi_is_device_linked();
+    String code = linked ? "ONLINE" : xiaozhi_get_pairing_code();
     char buf[128];
     snprintf(buf, sizeof(buf), "{\"ok\":true,\"code\":\"%s\",\"linked\":%s}",
              code.c_str(), linked ? "true" : "false");
