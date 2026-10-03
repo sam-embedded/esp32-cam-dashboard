@@ -674,6 +674,110 @@ static esp_err_t xiaozhi_regen_code_handler(httpd_req_t* req) {
     return httpd_resp_send(req, buf, strlen(buf));
 }
 
+// ─── XiaoZhi Agent Settings Handlers ─────────────────────────
+static esp_err_t xiaozhi_settings_get_handler(httpd_req_t* req) {
+    String name     = preferences.getString("xz_name",     "XiaoZhi AI (小智)");
+    String role     = preferences.getString("xz_role",     "Autonomous Vision Guardian & Assistant");
+    String prompt   = preferences.getString("xz_prompt",   "You are an autonomous AI camera guardian. Protect the premises and respond concisely.");
+    String provider = preferences.getString("xz_provider", "edge");
+    String lang     = preferences.getString("xz_lang",     "auto");
+    String apiKey   = preferences.getString("xz_key",      "");
+    String apiUrl   = preferences.getString("xz_url",      "https://api.deepseek.com/chat/completions");
+    String model    = preferences.getString("xz_model",    "deepseek-chat");
+    bool toolPhoto  = preferences.getBool("xz_t_photo",    true);
+    bool toolFlash  = preferences.getBool("xz_t_flash",    true);
+    bool toolRec    = preferences.getBool("xz_t_rec",      true);
+    bool toolTelem  = preferences.getBool("xz_t_telem",    true);
+
+    auto esc = [](const String& in) {
+        String out = "";
+        for (size_t i = 0; i < in.length(); i++) {
+            char c = in[i];
+            if (c == '"') out += "\\\"";
+            else if (c == '\\') out += "\\\\";
+            else if (c == '\n') out += "\\n";
+            else if (c == '\r') continue;
+            else out += c;
+        }
+        return out;
+    };
+
+    String json = "{";
+    json += "\"ok\":true,";
+    json += "\"name\":\"" + esc(name) + "\",";
+    json += "\"role\":\"" + esc(role) + "\",";
+    json += "\"prompt\":\"" + esc(prompt) + "\",";
+    json += "\"provider\":\"" + esc(provider) + "\",";
+    json += "\"lang\":\"" + esc(lang) + "\",";
+    json += "\"api_key\":\"" + esc(apiKey) + "\",";
+    json += "\"api_url\":\"" + esc(apiUrl) + "\",";
+    json += "\"model\":\"" + esc(model) + "\",";
+    json += "\"tool_photo\":" + String(toolPhoto ? "true" : "false") + ",";
+    json += "\"tool_flash\":" + String(toolFlash ? "true" : "false") + ",";
+    json += "\"tool_rec\":" + String(toolRec ? "true" : "false") + ",";
+    json += "\"tool_telem\":" + String(toolTelem ? "true" : "false");
+    json += "}";
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    return httpd_resp_send(req, json.c_str(), json.length());
+}
+
+static esp_err_t xiaozhi_settings_post_handler(httpd_req_t* req) {
+    char body[1024] = {};
+    int received = httpd_req_recv(req, body, sizeof(body) - 1);
+    if (received <= 0) { httpd_resp_send_500(req); return ESP_FAIL; }
+    body[received] = 0;
+
+    auto getParam = [&](const char* key, char* out, size_t outLen) {
+        char search[64];
+        snprintf(search, sizeof(search), "%s=", key);
+        char* p = strstr(body, search);
+        if (!p) { out[0] = 0; return; }
+        p += strlen(search);
+        char* end = strchr(p, '&');
+        size_t len = end ? (size_t)(end - p) : strlen(p);
+        if (len >= outLen) len = outLen - 1;
+        strncpy(out, p, len);
+        out[len] = 0;
+    };
+
+    char name[64] = {}, role[96] = {}, prompt[384] = {}, prov[32] = {}, lang[32] = {};
+    char key[128] = {}, url[128] = {}, model[64] = {};
+    char tPhoto[8] = {}, tFlash[8] = {}, tRec[8] = {}, tTelem[8] = {};
+
+    getParam("name", name, sizeof(name));
+    getParam("role", role, sizeof(role));
+    getParam("prompt", prompt, sizeof(prompt));
+    getParam("provider", prov, sizeof(prov));
+    getParam("lang", lang, sizeof(lang));
+    getParam("api_key", key, sizeof(key));
+    getParam("api_url", url, sizeof(url));
+    getParam("model", model, sizeof(model));
+    getParam("tool_photo", tPhoto, sizeof(tPhoto));
+    getParam("tool_flash", tFlash, sizeof(tFlash));
+    getParam("tool_rec", tRec, sizeof(tRec));
+    getParam("tool_telem", tTelem, sizeof(tTelem));
+
+    if (name[0])   preferences.putString("xz_name", urlDecode(name));
+    if (role[0])   preferences.putString("xz_role", urlDecode(role));
+    if (prompt[0]) preferences.putString("xz_prompt", urlDecode(prompt));
+    if (prov[0])   preferences.putString("xz_provider", urlDecode(prov));
+    if (lang[0])   preferences.putString("xz_lang", urlDecode(lang));
+    if (key[0])    preferences.putString("xz_key", urlDecode(key));
+    if (url[0])    preferences.putString("xz_url", urlDecode(url));
+    if (model[0])  preferences.putString("xz_model", urlDecode(model));
+
+    if (tPhoto[0]) preferences.putBool("xz_t_photo", atoi(tPhoto) != 0);
+    if (tFlash[0]) preferences.putBool("xz_t_flash", atoi(tFlash) != 0);
+    if (tRec[0])   preferences.putBool("xz_t_rec", atoi(tRec) != 0);
+    if (tTelem[0]) preferences.putBool("xz_t_telem", atoi(tTelem) != 0);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    return httpd_resp_send(req, "{\"ok\":true}", 11);
+}
+
 // ─── SD card download / inline preview ────────────────────────
 static esp_err_t sd_download_handler(httpd_req_t* req) {
     char query[256] = {};
@@ -886,7 +990,7 @@ void startCameraServer() {
     httpd_config_t config    = HTTPD_DEFAULT_CONFIG();
     config.server_port       = 80;
     config.ctrl_port         = 32769;   // different ctrl socket port
-    config.max_uri_handlers  = 36;
+    config.max_uri_handlers  = 40;
     config.max_open_sockets  = 4;       // 4 sockets saves ~15KB internal DRAM
     config.stack_size        = 8192;
     config.task_priority     = 4;
@@ -915,6 +1019,8 @@ void startCameraServer() {
         reg("/api/xiaozhi/code",    HTTP_GET,  xiaozhi_code_handler);
         reg("/api/xiaozhi/announce",HTTP_POST, xiaozhi_announce_handler);
         reg("/api/xiaozhi/regen",   HTTP_POST, xiaozhi_regen_code_handler);
+        reg("/api/xiaozhi/settings",HTTP_GET,  xiaozhi_settings_get_handler);
+        reg("/api/xiaozhi/settings",HTTP_POST, xiaozhi_settings_post_handler);
         reg("/api/telegram/test_msg",   HTTP_POST, telegram_test_msg_handler);
         reg("/api/telegram/test_photo", HTTP_POST, telegram_test_photo_handler);
         reg("/api/telegram/test_voice", HTTP_POST, telegram_test_voice_handler);

@@ -501,12 +501,20 @@ String xiaozhi_ai_chat(const String& prompt) {
     String lower = text;
     lower.toLowerCase();
 
+    String agentName = preferences.getString("xz_name", "XiaoZhi AI (小智)");
+    String agentRole = preferences.getString("xz_role", "Autonomous Vision Guardian & Assistant");
+    String sysPrompt = preferences.getString("xz_prompt", "");
+    bool allowPhoto  = preferences.getBool("xz_t_photo", true);
+    bool allowFlash  = preferences.getBool("xz_t_flash", true);
+    bool allowRec    = preferences.getBool("xz_t_rec",   true);
+    bool allowTelem  = preferences.getBool("xz_t_telem", true);
+
     // 0. Verification Pairing Code query
     if (lower == "code" || lower.indexOf("verification") >= 0 || lower.indexOf("pair") >= 0 ||
         lower.indexOf("bind") >= 0 || lower.indexOf("验证码") >= 0 || lower.indexOf("配对") >= 0) {
         String c = xiaozhi_get_pairing_code();
         bool linked = xiaozhi_is_device_linked();
-        return "🔑 *XiaoZhi AI 6-Digit Pairing Code:* `" + c + "`\n"
+        return "🔑 *" + agentName + " 6-Digit Pairing Code:* `" + c + "`\n"
                "Status: " + (linked ? "Device Linked ✅" : "Unlinked / Ready to Pair ⚠️") + "\n\n"
                "Enter this code on [xiaozhi.me](https://xiaozhi.me) or reply `/bind " + c + "` to authorize your Telegram account!";
     }
@@ -515,26 +523,30 @@ String xiaozhi_ai_chat(const String& prompt) {
     if (lower.indexOf("photo") >= 0 || lower.indexOf("snap") >= 0 || lower.indexOf("picture") >= 0 ||
         lower.indexOf("capture") >= 0 || lower.indexOf("look") >= 0 || lower.indexOf("see") >= 0 ||
         lower.indexOf("拍照") >= 0 || lower.indexOf("看") >= 0 || lower == "/photo") {
-        telegram_send_photo("📸 XiaoZhi AI Snapshot");
-        return "📸 *XiaoZhi AI:* Live photo captured and queued to Telegram!";
+        if (!allowPhoto) return "⚠️ *" + agentName + ":* Camera snapshot action is disabled in Agent Settings.";
+        telegram_send_photo(("📸 " + agentName + " Snapshot").c_str());
+        return "📸 *" + agentName + ":* Live photo captured and queued to Telegram!";
     }
 
     // 2. Flash Light Controls
     if (lower.indexOf("flash on") >= 0 || lower.indexOf("light on") >= 0 || lower.indexOf("torch on") >= 0 ||
         lower.indexOf("open light") >= 0 || lower.indexOf("开灯") >= 0) {
+        if (!allowFlash) return "⚠️ *" + agentName + ":* Flashlight action is disabled in Agent Settings.";
         digitalWrite(g_flash_pin, HIGH);
-        return "💡 *XiaoZhi AI:* Flash spotlight is now **ON**!";
+        return "💡 *" + agentName + ":* Flash spotlight is now **ON**!";
     }
     if (lower.indexOf("flash off") >= 0 || lower.indexOf("light off") >= 0 || lower.indexOf("torch off") >= 0 ||
         lower.indexOf("close light") >= 0 || lower.indexOf("关灯") >= 0) {
+        if (!allowFlash) return "⚠️ *" + agentName + ":* Flashlight action is disabled in Agent Settings.";
         digitalWrite(g_flash_pin, LOW);
-        return "💡 *XiaoZhi AI:* Flash spotlight is now **OFF**.";
+        return "💡 *" + agentName + ":* Flash spotlight is now **OFF**.";
     }
     if (lower == "/flash" || lower == "flash" || lower == "toggle light" || lower == "light") {
+        if (!allowFlash) return "⚠️ *" + agentName + ":* Flashlight action is disabled in Agent Settings.";
         int cur = digitalRead(g_flash_pin);
         int next = (cur == HIGH) ? LOW : HIGH;
         digitalWrite(g_flash_pin, next);
-        return (next == HIGH) ? "💡 *XiaoZhi AI:* Flash toggled **ON**!" : "💡 *XiaoZhi AI:* Flash toggled **OFF**.";
+        return (next == HIGH) ? ("💡 *" + agentName + ":* Flash toggled **ON**!") : ("💡 *" + agentName + ":* Flash toggled **OFF**.");
     }
 
     // 3. Status & Health
@@ -661,22 +673,24 @@ String xiaozhi_ai_chat(const String& prompt) {
     if (lower == "hi" || lower == "hello" || lower == "hey" || lower.indexOf("who are you") >= 0 ||
         lower.indexOf("小智") >= 0 || lower.indexOf("你好") >= 0 || lower.indexOf("你是谁") >= 0 ||
         lower.startsWith("/start") || lower.startsWith("/help") || lower == "help") {
-        return "✨ *XiaoZhi AI (小智) Agent Online!*\n"
-               "I am your intelligent autonomous agent running natively on ESP32-CAM.\n\n"
-               "🗣️ *Natural Language Commands:*\n"
-               "• `Take a photo` / `look` — Capture & send live photo\n"
-               "• `Turn on flash` / `flash off` — Toggle spotlight\n"
-               "• `Status` / `health` — View live hardware telemetry\n"
-               "• `IP address` — Get web dashboard links\n"
-               "• `SD card` — Check storage usage\n"
-               "• `VGA` / `UXGA` — Tune camera resolution\n"
-               "• `Flip` / `Mirror` — Rotate image orientation\n"
-               "• `Start recording` / `Stop recording`\n"
+        return "✨ *" + agentName + " Online!*\n" +
+               "*" + agentRole + "*\n\n" +
+               (sysPrompt.length() > 0 ? ("📜 _\"" + sysPrompt + "\"_\n\n") : "") +
+               "🗣️ *Natural Language Commands:*\n" +
+               "• `Take a photo` / `look` — Capture & send live photo\n" +
+               "• `Turn on flash` / `flash off` — Toggle spotlight\n" +
+               "• `Status` / `health` — View live hardware telemetry\n" +
+               "• `IP address` — Get web dashboard links\n" +
+               "• `SD card` — Check storage usage\n" +
+               "• `VGA` / `UXGA` — Tune camera resolution\n" +
+               "• `Flip` / `Mirror` — Rotate image orientation\n" +
+               "• `Start recording` / `Stop recording`\n" +
                "• `Reboot` — Safely restart device";
     }
 
     // 12. Fallback
-    return "🤖 *XiaoZhi AI:* I received: _\"" + text + "\"_\n\n"
+    return "🤖 *" + agentName + ":* I received: _\"" + text + "\"_\n\n" +
+           (sysPrompt.length() > 0 ? ("*Directive:* " + sysPrompt + "\n\n") : "") +
            "You can ask me to take a photo (`photo`), turn on the light (`flash on`), report health (`status`), or adjust resolution. Type `help` for full controls!";
 }
 

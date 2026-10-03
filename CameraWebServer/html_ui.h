@@ -1131,6 +1131,91 @@ I have full control over camera capture, flash spotlight, SD card storage, and s
           </div>
         </div>
 
+        <!-- XiaoZhi Agent Personality & Model Settings -->
+        <div class="card" style="border-color:rgba(99,102,241,0.4);background:linear-gradient(180deg, rgba(99,102,241,0.08), rgba(15,23,42,0.6));">
+          <div class="card-header">
+            <span>⚙️ XiaoZhi Agent Personality & Model Settings</span>
+            <span class="val-badge" id="xz-model-badge" style="background:rgba(99,102,241,0.25);color:#a5b4fc;">Edge Engine</span>
+          </div>
+
+          <div class="form-group">
+            <span class="form-label">Agent Name</span>
+            <input type="text" id="cfg-xz-name" placeholder="XiaoZhi AI (小智)">
+            <span class="form-hint">Display name used in Telegram messages & voice greetings</span>
+          </div>
+
+          <div class="form-group">
+            <span class="form-label">Agent Role / Persona</span>
+            <input type="text" id="cfg-xz-role" placeholder="Autonomous Vision Guardian & Assistant">
+            <span class="form-hint">Character role (e.g. Smart Home Security, Private Butler, Vision Bot)</span>
+          </div>
+
+          <div class="form-group">
+            <span class="form-label">System Prompt / Custom Instructions</span>
+            <textarea id="cfg-xz-prompt" rows="3" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.3);border:1px solid var(--input-border);border-radius:6px;color:var(--text);padding:0.5rem;font-family:inherit;font-size:0.8rem;resize:vertical;" placeholder="You are an autonomous AI camera guardian. Protect the premises and respond concisely."></textarea>
+            <span class="form-hint">Direct instruction guidelines for the AI agent's behavior</span>
+          </div>
+
+          <div class="form-group">
+            <div class="form-row">
+              <div>
+                <span class="form-label">AI Backend Provider</span>
+                <select id="sel-xz-provider" onchange="onXzProviderChange()">
+                  <option value="edge">⚡ Edge Autonomous Engine (Local Fast, 0-Latency)</option>
+                  <option value="deepseek">🧠 DeepSeek (deepseek-chat)</option>
+                  <option value="openai">🤖 OpenAI (gpt-4o-mini / gpt-4o)</option>
+                  <option value="custom">🌐 Custom OpenAI-compatible API</option>
+                </select>
+              </div>
+              <div>
+                <span class="form-label">Speech Voice Language</span>
+                <select id="sel-xz-lang">
+                  <option value="auto">🌐 Auto-detect (Multilingual)</option>
+                  <option value="en">🇺🇸 English (en-US)</option>
+                  <option value="zh-CN">🇨🇳 Mandarin (zh-CN)</option>
+                  <option value="es">🇪🇸 Spanish (es-ES)</option>
+                  <option value="hi">🇮🇳 Hindi (hi-IN)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div id="xz-cloud-group" style="display:none;">
+            <div class="form-group">
+              <span class="form-label">API Key</span>
+              <input type="password" id="cfg-xz-key" placeholder="sk-...">
+              <span class="form-hint">Your API secret key for DeepSeek, OpenAI, or custom LLM</span>
+            </div>
+
+            <div class="form-group">
+              <div class="form-row">
+                <div>
+                  <span class="form-label">API Endpoint URL</span>
+                  <input type="text" id="cfg-xz-url" placeholder="https://api.deepseek.com/chat/completions">
+                </div>
+                <div>
+                  <span class="form-label">Model Name</span>
+                  <input type="text" id="cfg-xz-model" placeholder="deepseek-chat">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <span class="form-label">MCP Tool Actions Enabled</span>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;font-size:0.8rem;margin-top:0.3rem;">
+              <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;"><input type="checkbox" id="chk-tool-photo" checked> 📸 Camera Snapshot</label>
+              <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;"><input type="checkbox" id="chk-tool-flash" checked> 💡 Flash Spotlight</label>
+              <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;"><input type="checkbox" id="chk-tool-rec" checked> 🎬 SD Video Record</label>
+              <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;"><input type="checkbox" id="chk-tool-telemetry" checked> 📊 Health Telemetry</label>
+            </div>
+          </div>
+
+          <div class="form-group" style="display:flex;justify-content:flex-end;">
+            <button class="btn btn-accent" onclick="saveAgentSettings()">💾 Save Agent Settings</button>
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-header">Telegram Bot & Voice Integration</div>
           
@@ -1977,6 +2062,78 @@ I have full control over camera capture, flash spotlight, SD card storage, and s
         .catch(() => showToast('❌ Network error regenerating code'));
     }
 
+    // ─── XiaoZhi Agent Settings ─────────────────────────────────
+    function onXzProviderChange() {
+      const sel = document.getElementById('sel-xz-provider');
+      if (!sel) return;
+      const prov = sel.value;
+      const cg = document.getElementById('xz-cloud-group');
+      const badge = document.getElementById('xz-model-badge');
+      if (prov === 'edge') {
+        if (cg) cg.style.display = 'none';
+        if (badge) { badge.innerText = 'Edge Engine'; badge.style.color = '#a5b4fc'; }
+      } else {
+        if (cg) cg.style.display = 'block';
+        if (badge) {
+          badge.innerText = prov.toUpperCase();
+          badge.style.color = '#38bdf8';
+        }
+      }
+    }
+
+    function loadAgentSettings() {
+      fetch('/api/xiaozhi/settings')
+        .then(r => r.json())
+        .then(d => {
+          if (!d.ok) return;
+          if (d.name) document.getElementById('cfg-xz-name').value = d.name;
+          if (d.role) document.getElementById('cfg-xz-role').value = d.role;
+          if (d.prompt) document.getElementById('cfg-xz-prompt').value = d.prompt;
+          if (d.provider) {
+            document.getElementById('sel-xz-provider').value = d.provider;
+            onXzProviderChange();
+          }
+          if (d.lang) document.getElementById('sel-xz-lang').value = d.lang;
+          if (d.api_key) document.getElementById('cfg-xz-key').value = d.api_key;
+          if (d.api_url) document.getElementById('cfg-xz-url').value = d.api_url;
+          if (d.model) document.getElementById('cfg-xz-model').value = d.model;
+          if (d.tool_photo !== undefined) document.getElementById('chk-tool-photo').checked = d.tool_photo;
+          if (d.tool_flash !== undefined) document.getElementById('chk-tool-flash').checked = d.tool_flash;
+          if (d.tool_rec !== undefined) document.getElementById('chk-tool-rec').checked = d.tool_rec;
+          if (d.tool_telem !== undefined) document.getElementById('chk-tool-telemetry').checked = d.tool_telem;
+        })
+        .catch(() => {});
+    }
+
+    function saveAgentSettings() {
+      showToast('💾 Saving Agent Settings...');
+      const params = new URLSearchParams({
+        name:       document.getElementById('cfg-xz-name').value,
+        role:       document.getElementById('cfg-xz-role').value,
+        prompt:     document.getElementById('cfg-xz-prompt').value,
+        provider:   document.getElementById('sel-xz-provider').value,
+        lang:       document.getElementById('sel-xz-lang').value,
+        api_key:    document.getElementById('cfg-xz-key').value,
+        api_url:    document.getElementById('cfg-xz-url').value,
+        model:      document.getElementById('cfg-xz-model').value,
+        tool_photo: document.getElementById('chk-tool-photo').checked ? '1' : '0',
+        tool_flash: document.getElementById('chk-tool-flash').checked ? '1' : '0',
+        tool_rec:   document.getElementById('chk-tool-rec').checked ? '1' : '0',
+        tool_telem: document.getElementById('chk-tool-telemetry').checked ? '1' : '0'
+      });
+      fetch('/api/xiaozhi/settings', { method: 'POST', body: params.toString() })
+        .then(r => r.json())
+        .then(d => {
+          if (d.ok) {
+            showToast('✅ XiaoZhi Agent Settings Saved!');
+            onXzProviderChange();
+          } else {
+            showToast('❌ Failed to save agent settings');
+          }
+        })
+        .catch(() => showToast('❌ Network error saving settings'));
+    }
+
     // ─── Telegram Diagnostics ───────────────────────────────────
     function testRawHTTPS() {
       showToast('🔒 Testing Telegram TLS handshake...');
@@ -2153,6 +2310,7 @@ I have full control over camera capture, flash spotlight, SD card storage, and s
       pollTelemetry();
       setInterval(pollTelemetry, 2000);
       loadSystemSettings();
+      loadAgentSettings();
       switchSection('cam');
     });
   </script>
