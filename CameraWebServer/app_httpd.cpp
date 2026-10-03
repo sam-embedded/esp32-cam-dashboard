@@ -312,6 +312,7 @@ static esp_err_t system_get_handler(httpd_req_t* req) {
         "\"tg_chat_id\":\"%s\","
         "\"rec_enabled\":%s,"
         "\"rec_interval\":%u,"
+        "\"tg_voice\":%s,"
         "\"fps\":%d,"
         "\"ntp_server1\":\"%s\","
         "\"ntp_server2\":\"%s\","
@@ -344,6 +345,7 @@ static esp_err_t system_get_handler(httpd_req_t* req) {
         preferences.getString("tg_chat_id",   "318862528").c_str(),
         preferences.getBool("rec_enabled",    true) ? "true" : "false",
         preferences.getUInt("rec_interval",   15),
+        preferences.getBool("tg_voice",       true) ? "true" : "false",
         g_stream_fps,
         preferences.getString("ntp_server1",  "pool.ntp.org").c_str(),
         preferences.getString("ntp_server2",  "time.nist.gov").c_str(),
@@ -396,7 +398,7 @@ static esp_err_t system_config_handler(httpd_req_t* req) {
     };
 
     char mdns[64] = {}, ssid[64] = {}, pass[64] = {};
-    char token[120] = {}, chats[120] = {}, rec_en[4] = {}, rec_iv[8] = {};
+    char token[120] = {}, chats[120] = {}, rec_en[4] = {}, rec_iv[8] = {}, tg_vc[8] = {};
     char ntp1[64] = {}, ntp2[64] = {}, ntp_off[16] = {}, ntp_dst[8] = {};
     getParam("mdns_name",    mdns,   sizeof(mdns));
     getParam("wifi_ssid",    ssid,   sizeof(ssid));
@@ -405,6 +407,7 @@ static esp_err_t system_config_handler(httpd_req_t* req) {
     getParam("tg_chat_id",   chats,  sizeof(chats));
     getParam("rec_enabled",  rec_en, sizeof(rec_en));
     getParam("rec_interval", rec_iv, sizeof(rec_iv));
+    getParam("tg_voice",     tg_vc,  sizeof(tg_vc));
     getParam("ntp_server1",  ntp1,   sizeof(ntp1));
     getParam("ntp_server2",  ntp2,   sizeof(ntp2));
     getParam("ntp_offset",   ntp_off,sizeof(ntp_off));
@@ -417,6 +420,7 @@ static esp_err_t system_config_handler(httpd_req_t* req) {
     if (chats[0])   preferences.putString("tg_chat_id",  urlDecode(chats));
     if (rec_en[0])  preferences.putBool("rec_enabled",   atoi(rec_en) != 0);
     if (rec_iv[0])  preferences.putUInt("rec_interval",  atoi(rec_iv));
+    if (tg_vc[0])   preferences.putBool("tg_voice",      atoi(tg_vc) != 0);
     if (ntp1[0])    preferences.putString("ntp_server1", urlDecode(ntp1));
     if (ntp2[0])    preferences.putString("ntp_server2", urlDecode(ntp2));
     if (ntp_off[0]) preferences.putLong("ntp_offset",    atol(ntp_off));
@@ -800,6 +804,12 @@ static esp_err_t telegram_test_https_handler(httpd_req_t* req) {
     return httpd_resp_send(req, res.c_str(), res.length());
 }
 
+static esp_err_t telegram_test_voice_handler(httpd_req_t* req) {
+    telegram_send_voice("Hello Sam! XiaoZhi AI voice output is fully working on Telegram.");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    return httpd_resp_send(req, "{\"ok\":true}", 11);
+}
+
 // ─── startCameraServer() ─────────────────────────────────────
 void startCameraServer() {
     g_stream_fps = preferences.getInt("cam_fps", 25);
@@ -838,7 +848,7 @@ void startCameraServer() {
     httpd_config_t config    = HTTPD_DEFAULT_CONFIG();
     config.server_port       = 80;
     config.ctrl_port         = 32769;   // different ctrl socket port
-    config.max_uri_handlers  = 28;
+    config.max_uri_handlers  = 32;
     config.max_open_sockets  = 4;       // 4 sockets saves ~15KB internal DRAM
     config.stack_size        = 8192;
     config.task_priority     = 4;
@@ -866,6 +876,8 @@ void startCameraServer() {
         reg("/api/xiaozhi/chat",    HTTP_POST, xiaozhi_chat_handler);
         reg("/api/telegram/test_msg",   HTTP_POST, telegram_test_msg_handler);
         reg("/api/telegram/test_photo", HTTP_POST, telegram_test_photo_handler);
+        reg("/api/telegram/test_voice", HTTP_POST, telegram_test_voice_handler);
+        reg("/api/telegram/test_voice", HTTP_GET,  telegram_test_voice_handler);
         reg("/api/telegram/test_https", HTTP_GET,  telegram_test_https_handler);
         reg("/api/sdcard/info",     HTTP_GET,  sd_info_handler);
         reg("/api/sdcard/list",     HTTP_GET,  sd_list_handler);

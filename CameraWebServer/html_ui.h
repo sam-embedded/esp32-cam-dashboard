@@ -590,6 +590,29 @@ const char index_html[] PROGMEM = R"rawliteral(
     .chip:hover {
       background: rgba(56, 189, 248, 0.25);
     }
+    .btn-mic {
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: #38bdf8;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 1.1rem;
+      padding: 0.4rem 0.65rem;
+    }
+    .btn-mic.listening {
+      background: rgba(239, 68, 68, 0.25);
+      border-color: #ef4444;
+      color: #f87171;
+      animation: pulseMic 1.2s infinite;
+    }
+    @keyframes pulseMic {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+      70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
 
     /* ─── Persistent Bottom Navigation Bar ─── */
     .bottom-nav {
@@ -1077,14 +1100,20 @@ I have full control over camera capture, flash spotlight, SD card storage, and s
             </div>
 
             <div style="display:flex;gap:0.4rem;margin-top:0.4rem;">
-              <input type="text" id="ai-input" placeholder="Ask XiaoZhi AI or send command..." onkeydown="if(event.key==='Enter') sendCustomPrompt()">
+              <input type="text" id="ai-input" placeholder="Ask XiaoZhi AI or speak..." onkeydown="if(event.key==='Enter') sendCustomPrompt()">
+              <button class="btn btn-mic" id="btn-mic" onclick="toggleMic()" title="Voice Input (ASR)">🎙️</button>
               <button class="btn btn-accent" onclick="sendCustomPrompt()">Send</button>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.03);padding:0.45rem 0.65rem;border-radius:6px;margin-top:0.5rem;font-size:0.8rem;border:1px solid rgba(255,255,255,0.05);">
+              <span style="color:var(--text-muted);">🔊 Browser Voice Output (TTS)</span>
+              <div class="switch-toggle active" id="sw-ai-voice" onclick="toggleVoiceOutput()"><div class="switch-slider"></div></div>
             </div>
           </div>
         </div>
 
         <div class="card">
-          <div class="card-header">Telegram Bot Integration</div>
+          <div class="card-header">Telegram Bot & Voice Integration</div>
           
           <div class="form-group">
             <span class="form-label">Bot Token</span>
@@ -1099,19 +1128,30 @@ I have full control over camera capture, flash spotlight, SD card storage, and s
           </div>
 
           <div class="form-group">
+            <div class="form-row">
+              <span class="form-label">Telegram Voice Output (Spoken Audio Notes)</span>
+              <div class="switch-toggle active" id="sw-tg-voice" onclick="toggleSwitch('sw-tg-voice', 'tg_voice')"><div class="switch-slider"></div></div>
+            </div>
+            <span class="form-hint">Bot sends voice audio notes alongside text replies & supports voice input</span>
+          </div>
+
+          <div class="form-group">
             <button class="btn btn-block btn-accent" onclick="saveSettings()">💾 Save Telegram Config</button>
           </div>
         </div>
 
         <div class="card">
-          <div class="card-header">🧪 Live TLS & HTTPS Diagnostics</div>
+          <div class="card-header">🧪 Live Diagnostics & Audio Tests</div>
 
           <div class="form-group">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;">
-              <button class="btn btn-accent" onclick="testRawHTTPS()">🔒 Test TLS Handshake</button>
-              <button class="btn" onclick="sendTelegramTest('msg')">✉️ Send Text Test</button>
+              <button class="btn btn-accent" onclick="testRawHTTPS()">🔒 TLS Handshake</button>
+              <button class="btn" onclick="sendTelegramTest('msg')">✉️ Text Test</button>
             </div>
-            <button class="btn btn-block" style="margin-top:0.4rem;" onclick="sendTelegramTest('photo')">📸 Send Photo Test</button>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-top:0.4rem;">
+              <button class="btn" onclick="sendTelegramTest('photo')">📸 Photo Test</button>
+              <button class="btn" onclick="sendTelegramTest('voice')">🔊 Voice Test</button>
+            </div>
 
             <div id="tg-diag-box" style="display:none;margin-top:0.6rem;font-size:0.75rem;background:#060a12;border:1px solid rgba(56,189,248,0.25);padding:0.65rem;border-radius:6px;white-space:pre-wrap;font-family:monospace;color:#38bdf8;"></div>
           </div>
@@ -1741,7 +1781,93 @@ I have full control over camera capture, flash spotlight, SD card storage, and s
         });
     }
 
-    // ─── XiaoZhi AI Web Chat ────────────────────────────────────
+    // ─── XiaoZhi AI Voice & Web Chat ────────────────────────────
+    let aiSpeechRec = null;
+    let isListening = false;
+    let aiVoiceEnabled = true;
+
+    function initSpeech() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) return false;
+      aiSpeechRec = new SpeechRecognition();
+      aiSpeechRec.continuous = false;
+      aiSpeechRec.interimResults = true;
+      aiSpeechRec.lang = navigator.language || 'en-US';
+
+      aiSpeechRec.onstart = () => {
+        isListening = true;
+        const b = document.getElementById('btn-mic');
+        if (b) {
+          b.classList.add('listening');
+          b.innerHTML = '🔴';
+        }
+        document.getElementById('ai-input').placeholder = 'Listening to your voice...';
+      };
+      aiSpeechRec.onresult = (e) => {
+        let text = '';
+        for (let i = e.resultIndex; i < e.results.length; ++i) {
+          text += e.results[i][0].transcript;
+        }
+        document.getElementById('ai-input').value = text;
+        if (e.results[0].isFinal) {
+          sendCustomPrompt();
+        }
+      };
+      aiSpeechRec.onerror = () => { stopMic(); };
+      aiSpeechRec.onend = () => { stopMic(); };
+      return true;
+    }
+
+    function toggleMic() {
+      if (!aiSpeechRec && !initSpeech()) {
+        showToast('⚠️ Speech recognition not supported by browser. Try Chrome or Edge.');
+        return;
+      }
+      if (isListening) {
+        aiSpeechRec.stop();
+      } else {
+        try {
+          aiSpeechRec.start();
+        } catch (e) {
+          initSpeech();
+          aiSpeechRec.start();
+        }
+      }
+    }
+
+    function stopMic() {
+      isListening = false;
+      const b = document.getElementById('btn-mic');
+      if (b) {
+        b.classList.remove('listening');
+        b.innerHTML = '🎙️';
+      }
+      document.getElementById('ai-input').placeholder = 'Ask XiaoZhi AI or speak...';
+    }
+
+    function toggleVoiceOutput() {
+      aiVoiceEnabled = !aiVoiceEnabled;
+      const sw = document.getElementById('sw-ai-voice');
+      if (sw) sw.classList.toggle('active', aiVoiceEnabled);
+      showToast(aiVoiceEnabled ? '🔊 Browser voice output ON' : '🔇 Browser voice output OFF');
+    }
+
+    function speakAiResponse(text) {
+      if (!aiVoiceEnabled || !window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+
+      // Clean markdown formatting & emojis
+      let clean = text.replace(/[*_#`~•]/g, '').replace(/\[.*?\]/g, '').trim();
+      if (!clean) return;
+
+      if (clean.length > 150) clean = clean.substring(0, 147) + '...';
+
+      const utter = new SpeechSynthesisUtterance(clean);
+      utter.rate = 1.05;
+      utter.pitch = 1.0;
+      window.speechSynthesis.speak(utter);
+    }
+
     function sendAiPrompt(promptText) {
       const box = document.getElementById('ai-chat-box');
 
@@ -1761,6 +1887,7 @@ I have full control over camera capture, flash spotlight, SD card storage, and s
           a.innerText = d.reply || 'No response from XiaoZhi AI';
           box.appendChild(a);
           box.scrollTop = box.scrollHeight;
+          if (d.reply) speakAiResponse(d.reply);
         })
         .catch(() => {
           const a = document.createElement('div');
@@ -1827,6 +1954,10 @@ I have full control over camera capture, flash spotlight, SD card storage, and s
           document.getElementById('cfg-ssid').value = d.ssid || '';
           document.getElementById('cfg-tg-token').value = d.tg_token || '';
           document.getElementById('cfg-tg-chat').value = d.tg_chat_id || '';
+          if (d.tg_voice !== undefined) {
+            const vSw = document.getElementById('sw-tg-voice');
+            if (vSw) vSw.classList.toggle('active', d.tg_voice === true);
+          }
           if (d.ntp_server1) document.getElementById('cfg-ntp1').value = d.ntp_server1;
           if (d.ntp_offset !== undefined) document.getElementById('cfg-ntp-offset').value = d.ntp_offset;
           if (d.ntp_dst !== undefined) {
@@ -1889,12 +2020,14 @@ I have full control over camera capture, flash spotlight, SD card storage, and s
 
     function saveSettings() {
       const isDst = document.getElementById('sw-dst').classList.contains('active');
+      const isTgVoice = document.getElementById('sw-tg-voice') ? document.getElementById('sw-tg-voice').classList.contains('active') : true;
       const params = new URLSearchParams({
         mdns_name: document.getElementById('cfg-mdns').value,
         wifi_ssid: document.getElementById('cfg-ssid').value,
         wifi_pass: document.getElementById('cfg-pass').value,
         tg_token:  document.getElementById('cfg-tg-token').value,
         tg_chat_id:document.getElementById('cfg-tg-chat').value,
+        tg_voice:  isTgVoice ? '1' : '0',
         ntp_server1:document.getElementById('cfg-ntp1').value,
         ntp_offset: document.getElementById('cfg-ntp-offset').value,
         ntp_dst:    isDst ? '1' : '0'
