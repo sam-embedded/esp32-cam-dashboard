@@ -353,6 +353,9 @@ static void TaskTelemetry(void* pvParameters) {
                 formatUptime(up).c_str()
             );
             telegram_send_message(notifyMsg);
+            if (g_is_initial_boot_notify) {
+                xiaozhi_announce_code(true);
+            }
             g_is_initial_boot_notify = false;
         }
 

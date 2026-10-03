@@ -313,6 +313,8 @@ static esp_err_t system_get_handler(httpd_req_t* req) {
         "\"rec_enabled\":%s,"
         "\"rec_interval\":%u,"
         "\"tg_voice\":%s,"
+        "\"xz_code\":\"%s\","
+        "\"xz_linked\":%s,"
         "\"fps\":%d,"
         "\"ntp_server1\":\"%s\","
         "\"ntp_server2\":\"%s\","
@@ -346,6 +348,8 @@ static esp_err_t system_get_handler(httpd_req_t* req) {
         preferences.getBool("rec_enabled",    true) ? "true" : "false",
         preferences.getUInt("rec_interval",   15),
         preferences.getBool("tg_voice",       true) ? "true" : "false",
+        xiaozhi_get_pairing_code().c_str(),
+        xiaozhi_is_device_linked() ? "true" : "false",
         g_stream_fps,
         preferences.getString("ntp_server1",  "pool.ntp.org").c_str(),
         preferences.getString("ntp_server2",  "time.nist.gov").c_str(),
@@ -636,6 +640,40 @@ static esp_err_t xiaozhi_chat_handler(httpd_req_t* req) {
     return httpd_resp_send(req, json.c_str(), json.length());
 }
 
+// ─── XiaoZhi Code & Announce Handlers ─────────────────────────
+static esp_err_t xiaozhi_code_handler(httpd_req_t* req) {
+    String code = xiaozhi_get_pairing_code();
+    bool linked = xiaozhi_is_device_linked();
+    char buf[128];
+    snprintf(buf, sizeof(buf), "{\"ok\":true,\"code\":\"%s\",\"linked\":%s}",
+             code.c_str(), linked ? "true" : "false");
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    return httpd_resp_send(req, buf, strlen(buf));
+}
+
+static esp_err_t xiaozhi_announce_handler(httpd_req_t* req) {
+    xiaozhi_announce_code(true);
+    String code = xiaozhi_get_pairing_code();
+    bool linked = xiaozhi_is_device_linked();
+    char buf[128];
+    snprintf(buf, sizeof(buf), "{\"ok\":true,\"code\":\"%s\",\"linked\":%s}",
+             code.c_str(), linked ? "true" : "false");
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    return httpd_resp_send(req, buf, strlen(buf));
+}
+
+static esp_err_t xiaozhi_regen_code_handler(httpd_req_t* req) {
+    String code = xiaozhi_regen_code();
+    xiaozhi_announce_code(true);
+    char buf[128];
+    snprintf(buf, sizeof(buf), "{\"ok\":true,\"code\":\"%s\",\"linked\":false}", code.c_str());
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    return httpd_resp_send(req, buf, strlen(buf));
+}
+
 // ─── SD card download / inline preview ────────────────────────
 static esp_err_t sd_download_handler(httpd_req_t* req) {
     char query[256] = {};
@@ -848,7 +886,7 @@ void startCameraServer() {
     httpd_config_t config    = HTTPD_DEFAULT_CONFIG();
     config.server_port       = 80;
     config.ctrl_port         = 32769;   // different ctrl socket port
-    config.max_uri_handlers  = 32;
+    config.max_uri_handlers  = 36;
     config.max_open_sockets  = 4;       // 4 sockets saves ~15KB internal DRAM
     config.stack_size        = 8192;
     config.task_priority     = 4;
@@ -874,6 +912,9 @@ void startCameraServer() {
         reg("/api/camera/save",     HTTP_POST, camera_save_handler);
         reg("/api/xiaozhi/chat",    HTTP_GET,  xiaozhi_chat_handler);
         reg("/api/xiaozhi/chat",    HTTP_POST, xiaozhi_chat_handler);
+        reg("/api/xiaozhi/code",    HTTP_GET,  xiaozhi_code_handler);
+        reg("/api/xiaozhi/announce",HTTP_POST, xiaozhi_announce_handler);
+        reg("/api/xiaozhi/regen",   HTTP_POST, xiaozhi_regen_code_handler);
         reg("/api/telegram/test_msg",   HTTP_POST, telegram_test_msg_handler);
         reg("/api/telegram/test_photo", HTTP_POST, telegram_test_photo_handler);
         reg("/api/telegram/test_voice", HTTP_POST, telegram_test_voice_handler);

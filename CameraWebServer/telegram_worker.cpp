@@ -390,12 +390,122 @@ String xiaozhi_ai_voice_summary(const String& markdown_reply) {
     return clean;
 }
 
+// ─── XiaoZhi 6-Digit Pairing & Binding Manager ────────────────
+static String s_xiaozhi_code = "";
+
+String xiaozhi_format_digits_spoken(const String& code) {
+    const char* words[] = {"zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"};
+    String spoken = "";
+    for (size_t i = 0; i < code.length(); i++) {
+        char c = code[i];
+        if (c >= '0' && c <= '9') {
+            if (spoken.length() > 0) spoken += ", ";
+            spoken += words[c - '0'];
+        }
+    }
+    return spoken;
+}
+
+String xiaozhi_get_pairing_code() {
+    if (s_xiaozhi_code.length() == 6) return s_xiaozhi_code;
+    String saved = preferences.getString("xz_code", "");
+    if (saved.length() == 6) {
+        s_xiaozhi_code = saved;
+        return s_xiaozhi_code;
+    }
+    uint32_t num = 100000 + (esp_random() % 900000);
+    s_xiaozhi_code = String(num);
+    preferences.putString("xz_code", s_xiaozhi_code);
+    return s_xiaozhi_code;
+}
+
+String xiaozhi_regen_code() {
+    uint32_t num = 100000 + (esp_random() % 900000);
+    s_xiaozhi_code = String(num);
+    preferences.putString("xz_code", s_xiaozhi_code);
+    preferences.putBool("xz_linked", false);
+    return s_xiaozhi_code;
+}
+
+bool xiaozhi_is_device_linked() {
+    return preferences.getBool("xz_linked", false);
+}
+
+void xiaozhi_set_device_linked(bool linked) {
+    preferences.putBool("xz_linked", linked);
+}
+
+bool xiaozhi_verify_code(const String& input_code, const String& chat_id) {
+    String cleanInput = input_code;
+    cleanInput.trim();
+    String current = xiaozhi_get_pairing_code();
+    if (cleanInput == current) {
+        preferences.putBool("xz_linked", true);
+        if (!chat_id.isEmpty()) {
+            bool found = false;
+            for (const auto& id : tg_chat_ids) {
+                if (id == chat_id) { found = true; break; }
+            }
+            if (!found) {
+                tg_chat_ids.push_back(chat_id);
+                String allChats = preferences.getString("tg_chat_id", "");
+                if (allChats.isEmpty()) allChats = chat_id;
+                else allChats += "," + chat_id;
+                preferences.putString("tg_chat_id", allChats);
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
+void xiaozhi_announce_code(bool send_voice) {
+    String code = xiaozhi_get_pairing_code();
+    bool linked = xiaozhi_is_device_linked();
+    String spokenDigits = xiaozhi_format_digits_spoken(code);
+
+    char msg[600];
+    snprintf(msg, sizeof(msg),
+        "✨ *XiaoZhi AI (小智) %s Device*\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "🔑 *6-Digit Verification Code:* `%s`\n"
+        "🌐 *Device:* `esp32cam.local` | IP: `%s`\n"
+        "📡 *Status:* %s\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "👉 *To Link:* Enter `%s` on [xiaozhi.me](https://xiaozhi.me) or reply `/bind %s` to this bot!",
+        linked ? "Online" : "Unlinked",
+        code.c_str(),
+        WiFi.localIP().toString().c_str(),
+        linked ? "Device Linked ✅" : "Unlinked / Pairing Required ⚠️",
+        code.c_str(), code.c_str()
+    );
+
+    telegram_send_message(msg);
+
+    if (send_voice) {
+        String voiceText = linked ?
+            ("XiaoZhi AI online. Device is linked. Verification code is " + spokenDigits + ".") :
+            ("XiaoZhi AI online. Unlinked device verification code is " + spokenDigits + ". Please bind your device.");
+        telegram_send_voice(voiceText.c_str());
+    }
+}
+
 // ─── XiaoZhi AI (小智) Edge Agent Engine ───────────────────────
 String xiaozhi_ai_chat(const String& prompt) {
     String text = prompt;
     text.trim();
     String lower = text;
     lower.toLowerCase();
+
+    // 0. Verification Pairing Code query
+    if (lower == "code" || lower.indexOf("verification") >= 0 || lower.indexOf("pair") >= 0 ||
+        lower.indexOf("bind") >= 0 || lower.indexOf("验证码") >= 0 || lower.indexOf("配对") >= 0) {
+        String c = xiaozhi_get_pairing_code();
+        bool linked = xiaozhi_is_device_linked();
+        return "🔑 *XiaoZhi AI 6-Digit Pairing Code:* `" + c + "`\n"
+               "Status: " + (linked ? "Device Linked ✅" : "Unlinked / Ready to Pair ⚠️") + "\n\n"
+               "Enter this code on [xiaozhi.me](https://xiaozhi.me) or reply `/bind " + c + "` to authorize your Telegram account!";
+    }
 
     // 1. Photo / Capture
     if (lower.indexOf("photo") >= 0 || lower.indexOf("snap") >= 0 || lower.indexOf("picture") >= 0 ||
@@ -574,8 +684,39 @@ static void handleNewMessages(int numNewMessages) {
         String type    = g_bot->messages[i].type;
         text.trim();
 
+        String lower = text;
+        lower.toLowerCase();
+
+        // ── Check for 6-Digit Device Pairing (/bind 123456 or 123456) ──
+        String bindArg = "";
+        if (lower.startsWith("/bind")) {
+            bindArg = text.substring(5);
+            bindArg.trim();
+        } else if (text.length() == 6 && isdigit(text[0]) && isdigit(text[1]) && isdigit(text[2]) &&
+                   isdigit(text[3]) && isdigit(text[4]) && isdigit(text[5])) {
+            bindArg = text;
+        }
+
+        if (!bindArg.isEmpty()) {
+            if (xiaozhi_verify_code(bindArg, chat_id)) {
+                String reply = "🎉 *XiaoZhi AI Device Successfully Linked!*\n"
+                               "━━━━━━━━━━━━━━━━━━━━\n"
+                               "✅ Your Telegram Chat ID (`" + chat_id + "`) has been verified and permanently authorized.\n"
+                               "🤖 You now have full voice and text control over this camera device!";
+                g_bot->sendMessage(chat_id, reply, "Markdown");
+                telegram_send_voice_direct(chat_id, "Device successfully linked. Welcome to XiaoZhi AI!", "🎉 Linked");
+            } else {
+                String reply = "❌ *Invalid Verification Code!*\n"
+                               "Please check the 6-digit verification code announced by the device or visible in your Web Dashboard.";
+                g_bot->sendMessage(chat_id, reply, "Markdown");
+                telegram_send_voice_direct(chat_id, "Invalid verification code. Please try again.", "❌ Failed");
+            }
+            continue;
+        }
+
         if (!isChatAuthorized(chat_id)) {
-            g_bot->sendMessage(chat_id, "⛔ *Unauthorized access.* Your Chat ID is `" + chat_id + "`.", "Markdown");
+            String code = xiaozhi_get_pairing_code();
+            g_bot->sendMessage(chat_id, "⛔ *Device unlinked or unauthorized.*\nTo pair this Telegram account with XiaoZhi AI, reply with:\n`/bind " + code + "`", "Markdown");
             continue;
         }
 
@@ -596,9 +737,6 @@ static void handleNewMessages(int numNewMessages) {
             telegram_send_voice_direct(chat_id, "I received your voice note. All camera and system controls are active.", "🤖 XiaoZhi Voice Output");
             continue;
         }
-
-        String lower = text;
-        lower.toLowerCase();
 
         // Check for direct photo capture command
         if (lower == "/photo" || lower == "photo" || lower == "📷 photo" || lower.indexOf("take a photo") >= 0 ||

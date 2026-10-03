@@ -29,4 +29,10 @@ void telegram_send_voice_direct(const String& chat_id, const String& speech_text
 String telegram_test_raw_https();
 String xiaozhi_ai_chat(const String& prompt);  // XiaoZhi AI processing
 String xiaozhi_ai_voice_summary(const String& markdown_reply);
+String xiaozhi_get_pairing_code();
+String xiaozhi_regen_code();
+bool   xiaozhi_is_device_linked();
+void   xiaozhi_set_device_linked(bool linked);
+bool   xiaozhi_verify_code(const String& input_code, const String& chat_id);
+void   xiaozhi_announce_code(bool send_voice = true);
 void TaskTelegram(void* pvParameters);     // FreeRTOS task entry
