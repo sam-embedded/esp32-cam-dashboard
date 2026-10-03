@@ -6,6 +6,7 @@ bool  sd_manager_init();         // mount SD_MMC in 1-bit mode; returns true on 
 bool  sd_is_mounted();
 void  sd_get_info(uint64_t& total_bytes, uint64_t& used_bytes);
 void  sd_save_photo(uint8_t* buf, size_t len);  // saves to /photos/PHOTO_YYYYMMDD_HHMMSS.jpg
+bool  sd_delete_item(const String& path);        // deletes file or folder recursively
 
 // ─── Video recording task ─────────────────────────────────────
 void  recording_init();          // creates TaskRecording on Core 0

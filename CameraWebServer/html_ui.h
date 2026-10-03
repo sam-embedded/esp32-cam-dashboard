@@ -7,31 +7,29 @@ const char index_html[] PROGMEM = R"rawliteral(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#111827">
-  <title>ESP32-CAM Pro</title>
+  <meta name="theme-color" content="#0b0f19">
+  <title>ESP32-CAM XiaoZhi AI Pro</title>
   <style>
-    /* jQuery Mobile Dark Slate Theme System */
+    /* Modern Glassmorphic Dark Slate Theme */
     :root {
-      --jqm-page-bg: #0b0f19;
-      --jqm-bar-bg: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
-      --jqm-bar-border: #334155;
-      --jqm-inset-bg: #131d2e;
-      --jqm-inset-border: rgba(255, 255, 255, 0.08);
-      --jqm-divider-bg: linear-gradient(180deg, #1e293b 0%, #172033 100%);
-      --jqm-btn-bg: linear-gradient(180deg, #26354a 0%, #1a2537 100%);
-      --jqm-btn-border: #3b4d66;
-      --jqm-btn-active: #0284c7;
-      --jqm-btn-active-border: #38bdf8;
-      --jqm-accent: #0284c7;
-      --jqm-accent-glow: rgba(2, 132, 199, 0.4);
-      --jqm-text: #f8fafc;
-      --jqm-text-muted: #94a3b8;
-      --jqm-success: #10b981;
-      --jqm-danger: #ef4444;
-      --jqm-warning: #f59e0b;
-      --radius: 10px;
-      --header-height: 48px;
-      --bottom-nav-height: 56px;
+      --bg: #070a12;
+      --card-bg: rgba(17, 24, 39, 0.85);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-glow: rgba(56, 189, 248, 0.15);
+      --bar-bg: linear-gradient(180deg, #162032 0%, #0d1524 100%);
+      --bar-border: rgba(255, 255, 255, 0.1);
+      --accent: #0284c7;
+      --accent-hover: #0369a1;
+      --accent-glow: rgba(2, 132, 199, 0.4);
+      --accent-light: #38bdf8;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --radius: 12px;
+      --header-h: 48px;
+      --nav-h: 56px;
     }
 
     * {
@@ -44,18 +42,19 @@ const char index_html[] PROGMEM = R"rawliteral(
     }
 
     body {
-      background: var(--jqm-page-bg);
-      color: var(--jqm-text);
+      background: var(--bg);
+      color: var(--text);
       min-height: 100dvh;
       display: flex;
       flex-direction: column;
+      overflow-x: hidden;
     }
 
-    /* ─── jQuery Mobile Top Header ─── */
-    .ui-header {
-      background: var(--jqm-bar-bg);
-      border-bottom: 1px solid var(--jqm-bar-border);
-      height: var(--header-height);
+    /* ─── Top App Header ─── */
+    .app-header {
+      background: var(--bar-bg);
+      border-bottom: 1px solid var(--bar-border);
+      height: var(--header-h);
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -63,86 +62,96 @@ const char index_html[] PROGMEM = R"rawliteral(
       position: sticky;
       top: 0;
       z-index: 100;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
-    .ui-title {
-      font-size: 1.05rem;
+    .brand-title {
+      font-size: 1rem;
       font-weight: 700;
       color: #fff;
       display: flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.45rem;
       letter-spacing: -0.02em;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.6);
     }
-    .ui-header-right {
+    .brand-badge {
+      font-size: 0.65rem;
+      background: linear-gradient(135deg, #0284c7, #38bdf8);
+      color: #fff;
+      padding: 0.15rem 0.45rem;
+      border-radius: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .header-actions {
       display: flex;
       align-items: center;
       gap: 0.4rem;
     }
 
-    /* ─── jQuery Mobile Button Primitives ─── */
-    .ui-btn {
-      background: var(--jqm-btn-bg);
-      border: 1px solid var(--jqm-btn-border);
-      color: var(--jqm-text);
+    /* ─── Buttons ─── */
+    .btn {
+      background: linear-gradient(180deg, #243247 0%, #172233 100%);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--text);
       padding: 0.45rem 0.8rem;
       border-radius: 8px;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       font-weight: 600;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 0.35rem;
-      text-shadow: 0 1px 1px rgba(0,0,0,0.5);
-      box-shadow: 0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1);
       transition: all 0.15s ease;
       touch-action: manipulation;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
-    .ui-btn:active {
+    .btn:active {
       transform: translateY(1px);
       box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
-      background: #151e2d;
+      background: #111a29;
     }
-    .ui-btn-icon-only {
-      width: 38px;
-      height: 38px;
+    .btn-icon {
+      width: 36px;
+      height: 36px;
       padding: 0;
-      font-size: 1.1rem;
+      font-size: 1rem;
       border-radius: 8px;
     }
-    .ui-btn-accent {
+    .btn-accent {
       background: linear-gradient(180deg, #0284c7 0%, #0369a1 100%);
       border-color: #38bdf8;
       color: #fff;
+      box-shadow: 0 0 10px var(--accent-glow);
     }
-    .ui-btn-accent:active { background: #0284c7; }
-    .ui-btn-success {
+    .btn-accent:active { background: #0284c7; }
+    .btn-success {
       background: linear-gradient(180deg, #10b981 0%, #059669 100%);
       border-color: #34d399;
       color: #fff;
     }
-    .ui-btn-danger {
+    .btn-danger {
       background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
       border-color: #f87171;
       color: #fff;
     }
-    .ui-btn-block { width: 100%; }
+    .btn-block { width: 100%; }
 
     /* ─── Video Viewport (FROZEN / STICKY WHILE SCROLLING) ─── */
     .viewport-box {
       position: sticky;
-      top: var(--header-height);
+      top: var(--header-h);
       z-index: 70;
       width: 100%;
       background: #000;
-      height: clamp(185px, 30vh, 280px);
+      height: clamp(190px, 32vh, 290px);
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      border-bottom: 1px solid var(--jqm-bar-border);
+      border-bottom: 1px solid var(--bar-border);
       box-shadow: 0 4px 16px rgba(0,0,0,0.6);
     }
     #stream-img {
@@ -157,13 +166,13 @@ const char index_html[] PROGMEM = R"rawliteral(
       position: absolute;
       top: 8px;
       left: 8px;
-      background: rgba(15, 23, 42, 0.85);
+      background: rgba(11, 15, 25, 0.85);
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
-      border: 1px solid rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.12);
       border-radius: 8px;
-      padding: 0.35rem 0.65rem;
-      font-size: 0.75rem;
+      padding: 0.3rem 0.6rem;
+      font-size: 0.74rem;
       display: flex;
       align-items: center;
       gap: 0.45rem;
@@ -171,50 +180,50 @@ const char index_html[] PROGMEM = R"rawliteral(
       z-index: 10;
       box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
-    .hud-live-dot {
+    .live-dot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background: var(--jqm-danger);
+      background: var(--danger);
       transition: all 0.3s;
     }
-    .hud-live-dot.active {
-      background: var(--jqm-success);
-      box-shadow: 0 0 8px var(--jqm-success);
+    .live-dot.active {
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
     }
 
-    /* ─── Action Toolbar (Directly Below Video Viewport) ─── */
-    .stream-toolbar {
+    /* ─── Action Toolbar ─── */
+    .action-toolbar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0.6rem 0.85rem;
-      background: var(--jqm-bar-bg);
-      border-bottom: 1px solid var(--jqm-bar-border);
+      padding: 0.55rem 0.85rem;
+      background: var(--bar-bg);
+      border-bottom: 1px solid var(--bar-border);
       gap: 0.4rem;
       flex-wrap: wrap;
     }
-    .stream-tools-left, .stream-tools-right {
+    .tools-left, .tools-right {
       display: flex;
       align-items: center;
-      gap: 0.45rem;
+      gap: 0.4rem;
     }
 
-    /* ─── Stream FPS & Hardware Telemetry Strip ─── */
+    /* ─── Telemetry Strip ─── */
     .telemetry-strip {
       display: flex;
       flex-wrap: wrap;
       gap: 0.35rem;
-      padding: 0.55rem 0.85rem;
-      background: rgba(19, 29, 46, 0.75);
-      border-bottom: 1px solid var(--jqm-bar-border);
+      padding: 0.5rem 0.85rem;
+      background: rgba(17, 24, 39, 0.95);
+      border-bottom: 1px solid var(--card-border);
     }
-    .stat-pill {
+    .pill {
       background: rgba(255,255,255,0.05);
-      border: 1px solid var(--jqm-inset-border);
+      border: 1px solid rgba(255,255,255,0.08);
       border-radius: 6px;
-      padding: 0.25rem 0.55rem;
-      font-size: 0.76rem;
+      padding: 0.22rem 0.5rem;
+      font-size: 0.74rem;
       font-weight: 500;
       display: inline-flex;
       align-items: center;
@@ -222,10 +231,10 @@ const char index_html[] PROGMEM = R"rawliteral(
       white-space: nowrap;
     }
 
-    /* ─── Active Section Panel Container (Directly Below Action Toolbar & Telemetry) ─── */
-    .sections-container {
+    /* ─── Scrollable Content & Panels ─── */
+    .content-area {
       flex: 1;
-      padding-bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 1.5rem);
+      padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 1.5rem);
     }
     .section-pane {
       display: none;
@@ -234,111 +243,69 @@ const char index_html[] PROGMEM = R"rawliteral(
     .section-pane.active { display: block; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
-    /* ─── Persistent Bottom Sub-Navbar (jQuery Mobile Style) ─── */
-    .ui-subnav {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
-      padding-bottom: env(safe-area-inset-bottom, 0px);
-      background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
-      border-top: 1px solid var(--jqm-bar-border);
-      display: flex;
-      z-index: 100;
-      box-shadow: 0 -3px 12px rgba(0, 0, 0, 0.6);
-    }
-    .ui-subnav-btn {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 2px;
-      padding: 0.35rem 0.2rem;
-      background: transparent;
-      border: none;
-      border-right: 1px solid rgba(255,255,255,0.06);
-      color: var(--jqm-text-muted);
-      font-size: 0.7rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      touch-action: manipulation;
-    }
-    .ui-subnav-btn:last-child { border-right: none; }
-    .ui-subnav-btn:active { background: rgba(2, 132, 199, 0.12); }
-    .ui-subnav-btn.ui-btn-active {
-      color: #38bdf8;
-      background: rgba(2, 132, 199, 0.2);
-      box-shadow: inset 0 3px 0 #38bdf8;
-    }
-    .ui-subnav-btn .subnav-icon { font-size: 1.25rem; }
-
-    /* ─── jQuery Mobile Inset Listview ─── */
-    .ui-listview-inset {
+    /* ─── Card Containers & Lists ─── */
+    .card {
       margin: 0.85rem;
-      background: var(--jqm-inset-bg);
-      border: 1px solid var(--jqm-inset-border);
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
       border-radius: var(--radius);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
       overflow: hidden;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
     }
-    .ui-list-divider {
-      background: var(--jqm-divider-bg);
-      border-bottom: 1px solid var(--jqm-inset-border);
-      padding: 0.55rem 0.85rem;
-      font-size: 0.75rem;
+    .card-header {
+      background: linear-gradient(180deg, #1e293b 0%, #152033 100%);
+      border-bottom: 1px solid var(--card-border);
+      padding: 0.65rem 0.95rem;
+      font-size: 0.78rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      color: #38bdf8;
+      color: var(--accent-light);
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
-    .ui-field-contain {
-      padding: 0.75rem 0.85rem;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
+    .form-group {
+      padding: 0.75rem 0.95rem;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
       display: flex;
       flex-direction: column;
       gap: 0.4rem;
     }
-    .ui-field-contain:last-child { border-bottom: none; }
-    .ui-field-row {
+    .form-group:last-child { border-bottom: none; }
+    .form-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 0.5rem;
     }
-    .ui-label {
-      font-size: 0.85rem;
+    .form-label {
+      font-size: 0.84rem;
       font-weight: 600;
-      color: var(--jqm-text);
       display: flex;
       align-items: center;
       gap: 0.35rem;
     }
-    .ui-subtext {
+    .form-hint {
       font-size: 0.72rem;
-      color: var(--jqm-text-muted);
+      color: var(--text-muted);
     }
-    .ui-val-badge {
-      font-size: 0.8rem;
+    .val-badge {
+      font-size: 0.78rem;
       font-weight: 700;
-      color: #38bdf8;
-      background: rgba(56, 189, 248, 0.1);
-      padding: 0.15rem 0.5rem;
+      color: var(--accent-light);
+      background: rgba(56, 189, 248, 0.12);
+      padding: 0.15rem 0.45rem;
       border-radius: 4px;
       border: 1px solid rgba(56, 189, 248, 0.25);
     }
 
-    /* ─── Controls: Slider, Select, Input, Flipswitch ─── */
+    /* ─── Sliders & Controls ─── */
     input[type=range] {
       width: 100%;
-      height: 8px;
+      height: 7px;
       border-radius: 4px;
       background: rgba(255,255,255,0.12);
       outline: none;
@@ -357,69 +324,92 @@ const char index_html[] PROGMEM = R"rawliteral(
     }
     select, input[type=text], input[type=password], input[type=number], input[type=file] {
       width: 100%;
-      background: rgba(0,0,0,0.35);
-      border: 1px solid var(--jqm-inset-border);
+      background: rgba(0,0,0,0.4);
+      border: 1px solid var(--card-border);
       border-radius: 8px;
       color: #fff;
-      padding: 0.6rem 0.75rem;
-      font-size: 0.86rem;
+      padding: 0.55rem 0.75rem;
+      font-size: 0.85rem;
       outline: none;
       user-select: text;
     }
     select:focus, input:focus {
-      border-color: #38bdf8;
-      box-shadow: 0 0 0 2px var(--jqm-accent-glow);
+      border-color: var(--accent-light);
+      box-shadow: 0 0 0 2px var(--accent-glow);
     }
 
-    /* jQuery Mobile Flipswitch */
-    .ui-flipswitch {
+    /* Tactile Flipswitch */
+    .switch-toggle {
       display: inline-flex;
       position: relative;
-      width: 58px;
-      height: 30px;
+      width: 54px;
+      height: 28px;
       background: #1e293b;
-      border: 1px solid var(--jqm-btn-border);
-      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 14px;
       cursor: pointer;
       transition: all 0.2s ease;
       flex-shrink: 0;
     }
-    .ui-flipswitch input { opacity: 0; width: 0; height: 0; }
-    .ui-flipswitch-slider {
+    .switch-slider {
       position: absolute;
       top: 2px;
       left: 2px;
-      width: 24px;
-      height: 24px;
+      width: 22px;
+      height: 22px;
       background: #fff;
       border-radius: 50%;
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       box-shadow: 0 2px 4px rgba(0,0,0,0.4);
     }
-    .ui-flipswitch.active {
+    .switch-toggle.active {
       background: #0284c7;
       border-color: #38bdf8;
     }
-    .ui-flipswitch.active .ui-flipswitch-slider {
-      transform: translateX(28px);
-      background: #fff;
+    .switch-toggle.active .switch-slider {
+      transform: translateX(26px);
     }
 
-    /* ─── SD Card File Manager Components ─── */
+    /* ─── Presets Bar ─── */
+    .presets-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.4rem;
+      padding: 0.75rem 0.95rem;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .preset-chip {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--card-border);
+      padding: 0.4rem 0.2rem;
+      border-radius: 8px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 0.72rem;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+    .preset-chip:hover, .preset-chip:active {
+      background: rgba(2, 132, 199, 0.25);
+      border-color: #38bdf8;
+      color: #fff;
+    }
+
+    /* ─── SD Card File Manager ─── */
     .fm-toolbar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 0.5rem;
-      padding: 0.65rem 0.85rem;
+      gap: 0.4rem;
+      padding: 0.6rem 0.85rem;
       background: rgba(0,0,0,0.25);
-      border-bottom: 1px solid var(--jqm-inset-border);
+      border-bottom: 1px solid var(--card-border);
       flex-wrap: wrap;
     }
     .fm-breadcrumbs {
       display: flex;
       align-items: center;
-      gap: 0.35rem;
+      gap: 0.3rem;
       font-size: 0.82rem;
       overflow-x: auto;
       white-space: nowrap;
@@ -431,14 +421,14 @@ const char index_html[] PROGMEM = R"rawliteral(
       font-weight: 600;
     }
     .fm-crumb:hover { text-decoration: underline; }
-    .fm-progress-bar {
+    .progress-bar {
       height: 8px;
       background: rgba(255,255,255,0.1);
       border-radius: 4px;
       overflow: hidden;
       margin-top: 0.35rem;
     }
-    .fm-progress-fill {
+    .progress-fill {
       height: 100%;
       background: linear-gradient(90deg, #0284c7, #10b981);
       width: 0%;
@@ -463,7 +453,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     }
     .fm-card {
       background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--jqm-inset-border);
+      border: 1px solid var(--card-border);
       border-radius: 8px;
       padding: 0.55rem;
       display: flex;
@@ -493,7 +483,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     }
     .fm-card-preview {
       width: 100%;
-      height: 90px;
+      height: 88px;
       border-radius: 6px;
       background: rgba(0,0,0,0.4);
       display: flex;
@@ -518,7 +508,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     }
     .fm-card-meta {
       font-size: 0.68rem;
-      color: var(--jqm-text-muted);
+      color: var(--text-muted);
     }
     .fm-card-actions {
       display: flex;
@@ -542,10 +532,110 @@ const char index_html[] PROGMEM = R"rawliteral(
     .fm-row:hover { background: rgba(255,255,255,0.05); }
     .fm-row.selected { background: rgba(2, 132, 199, 0.2); }
     .fm-row-name { flex: 1; font-size: 0.82rem; font-weight: 500; word-break: break-all; }
-    .fm-row-size { font-size: 0.74rem; color: var(--jqm-text-muted); width: 70px; text-align: right; }
+    .fm-row-size { font-size: 0.74rem; color: var(--text-muted); width: 70px; text-align: right; }
 
-    /* ─── Lightbox / Dialog Popup ─── */
-    .ui-popup-backdrop {
+    /* ─── XiaoZhi AI Chat Console ─── */
+    .chat-box {
+      background: #060a12;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 8px;
+      padding: 0.75rem;
+      min-height: 160px;
+      max-height: 280px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 0.78rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .chat-bubble {
+      padding: 0.5rem 0.75rem;
+      border-radius: 8px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .chat-bubble.ai {
+      background: rgba(2, 132, 199, 0.2);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: #38bdf8;
+      align-self: flex-start;
+      max-width: 90%;
+    }
+    .chat-bubble.user {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #fff;
+      align-self: flex-end;
+      max-width: 85%;
+    }
+    .prompt-chips {
+      display: flex;
+      gap: 0.35rem;
+      overflow-x: auto;
+      padding: 0.4rem 0;
+    }
+    .chip {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      color: #38bdf8;
+      padding: 0.25rem 0.6rem;
+      border-radius: 14px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .chip:hover {
+      background: rgba(56, 189, 248, 0.25);
+    }
+
+    /* ─── Persistent Bottom Navigation Bar ─── */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      background: var(--bar-bg);
+      border-top: 1px solid var(--bar-border);
+      display: flex;
+      z-index: 100;
+      box-shadow: 0 -4px 16px rgba(0,0,0,0.6);
+    }
+    .nav-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      padding: 0.3rem 0.2rem;
+      background: transparent;
+      border: none;
+      border-right: 1px solid rgba(255,255,255,0.06);
+      color: var(--text-muted);
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      touch-action: manipulation;
+    }
+    .nav-btn:last-child { border-right: none; }
+    .nav-btn:active { background: rgba(2, 132, 199, 0.12); }
+    .nav-btn.active {
+      color: #38bdf8;
+      background: rgba(2, 132, 199, 0.2);
+      box-shadow: inset 0 3px 0 #38bdf8;
+    }
+    .nav-btn .nav-icon { font-size: 1.25rem; }
+
+    /* ─── Lightbox Modal ─── */
+    .modal-backdrop {
       position: fixed;
       inset: 0;
       background: rgba(0,0,0,0.85);
@@ -557,10 +647,10 @@ const char index_html[] PROGMEM = R"rawliteral(
       z-index: 500;
       padding: 1rem;
     }
-    .ui-popup-backdrop.open { display: flex; }
-    .ui-popup {
-      background: var(--jqm-page-bg);
-      border: 1px solid var(--jqm-btn-border);
+    .modal-backdrop.open { display: flex; }
+    .modal-card {
+      background: var(--bg);
+      border: 1px solid var(--card-border);
       border-radius: 12px;
       width: 100%;
       max-width: 600px;
@@ -568,21 +658,18 @@ const char index_html[] PROGMEM = R"rawliteral(
       box-shadow: 0 20px 40px rgba(0,0,0,0.8);
       animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    @keyframes popIn {
-      from { transform: scale(0.92); opacity: 0; }
-      to { transform: scale(1); opacity: 1; }
-    }
-    .ui-popup-header {
+    @keyframes popIn { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .modal-header {
       padding: 0.75rem 1rem;
-      background: var(--jqm-bar-bg);
-      border-bottom: 1px solid var(--jqm-bar-border);
+      background: var(--bar-bg);
+      border-bottom: 1px solid var(--bar-border);
       display: flex;
       justify-content: space-between;
       align-items: center;
       font-weight: 700;
-      font-size: 0.95rem;
+      font-size: 0.92rem;
     }
-    .ui-popup-body {
+    .modal-body {
       padding: 1rem;
       display: flex;
       flex-direction: column;
@@ -594,7 +681,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     /* ─── Toast Notifications ─── */
     .toast-box {
       position: fixed;
-      bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 12px);
+      bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 12px);
       left: 50%;
       transform: translateX(-50%);
       z-index: 999;
@@ -624,22 +711,19 @@ const char index_html[] PROGMEM = R"rawliteral(
       to { opacity: 1; transform: translateY(0); }
     }
 
-    /* ─── DESKTOP DASHBOARD ENHANCEMENT (≥ 960px) ─── */
+    /* ─── DESKTOP DASHBOARD (≥ 960px) ─── */
     @media (min-width: 960px) {
-      body {
-        height: 100vh;
-        overflow: hidden;
-      }
+      body { height: 100vh; overflow: hidden; }
       .main-layout {
         display: grid;
         grid-template-columns: 1.15fr 1fr;
-        height: calc(100vh - var(--header-height));
+        height: calc(100vh - var(--header-h));
         overflow: hidden;
       }
       .desktop-left-pane {
         display: flex;
         flex-direction: column;
-        border-right: 1px solid var(--jqm-bar-border);
+        border-right: 1px solid var(--bar-border);
         background: #000;
         height: 100%;
         overflow-y: auto;
@@ -656,150 +740,158 @@ const char index_html[] PROGMEM = R"rawliteral(
         flex-direction: column;
         height: 100%;
         overflow-y: auto;
-        background: var(--jqm-page-bg);
+        background: var(--bg);
       }
-      .sections-container {
-        padding-bottom: calc(var(--bottom-nav-height) + 1.5rem);
+      .content-area {
+        padding-bottom: calc(var(--nav-h) + 1rem);
       }
     }
   </style>
 </head>
 <body>
 
-  <!-- ─── jQuery Mobile Top App Header ─── -->
-  <header class="ui-header">
-    <div class="ui-title">
-      <span>📷</span> ESP32-CAM Pro
+  <!-- ─── Top App Header ─── -->
+  <header class="app-header">
+    <div class="brand-title">
+      <span>📷</span> ESP32-CAM <span class="brand-badge">XiaoZhi AI</span>
     </div>
-    <div class="ui-header-right">
-      <button class="ui-btn ui-btn-icon-only" id="header-btn-flash" onclick="toggleFlash()" title="Toggle Flash LED">💡</button>
-      <button class="ui-btn ui-btn-icon-only ui-btn-accent" onclick="capturePhoto()" title="Take Snapshot Photo">📷</button>
+    <div class="header-actions">
+      <button class="btn btn-icon" id="header-btn-flash" onclick="toggleFlash()" title="Toggle Flash Spotlight">💡</button>
+      <button class="btn btn-icon btn-accent" onclick="capturePhoto()" title="Take Snapshot Photo">📷</button>
     </div>
   </header>
 
-  <!-- ─── Unified Layout Container ─── -->
+  <!-- ─── Main Unified Layout ─── -->
   <div class="main-layout">
 
-    <!-- ─── Frozen Video Viewport Section ─── -->
+    <!-- ─── Video & Stream Section ─── -->
     <div class="desktop-left-pane">
       <!-- Video Viewport (FROZEN / STICKY AT TOP WHILE SCROLLING) -->
       <div class="viewport-box" id="viewport-box">
         <div class="hud-overlay">
-          <div class="hud-live-dot" id="live-indicator"></div>
+          <div class="live-dot" id="live-indicator"></div>
           <span id="hud-status" style="font-weight:700;">LIVE</span>
-          <span style="color:var(--jqm-text-muted);">|</span>
+          <span style="color:var(--text-muted);">|</span>
           <span id="hud-fps">25 FPS</span>
-          <span style="color:var(--jqm-text-muted);">|</span>
+          <span style="color:var(--text-muted);">|</span>
           <span id="hud-rssi">📶 -- dBm</span>
         </div>
         <img id="stream-img" src="" alt="ESP32-CAM Stream">
       </div>
 
       <!-- Quick Action Toolbar Under Video -->
-      <div class="stream-toolbar">
-        <div class="stream-tools-left">
-          <button class="ui-btn ui-btn-accent" onclick="capturePhoto()">📷 Snapshot</button>
-          <button class="ui-btn" id="btn-flash" onclick="toggleFlash()">💡 Flash OFF</button>
-          <button class="ui-btn" onclick="startStream()">🔄 Reload</button>
+      <div class="action-toolbar">
+        <div class="tools-left">
+          <button class="btn btn-accent" onclick="capturePhoto()">📷 Snapshot</button>
+          <button class="btn" id="btn-flash" onclick="toggleFlash()">💡 Flash OFF</button>
+          <button class="btn" onclick="startStream()">🔄 Reload</button>
         </div>
-        <div class="stream-tools-right">
-          <button class="ui-btn ui-btn-icon-only" onclick="toggleFullscreen()" title="Fullscreen">⛶</button>
+        <div class="tools-right">
+          <button class="btn btn-icon" onclick="toggleFullscreen()" title="Fullscreen">⛶</button>
         </div>
       </div>
 
       <!-- Stream FPS & Hardware Telemetry Strip -->
       <div class="telemetry-strip">
-        <div class="stat-pill" style="color:#38bdf8;">
-          <span class="hud-live-dot" id="pill-live-dot"></span>
+        <div class="pill" style="color:#38bdf8;">
+          <span class="live-dot" id="pill-live-dot"></span>
           <span id="stat-status">Connecting...</span>
         </div>
-        <div class="stat-pill" id="stat-fps">⚡ 25 FPS</div>
-        <div class="stat-pill" id="stat-rssi">📶 -- dBm</div>
-        <div class="stat-pill" id="stat-sd" style="color:#10b981;">💾 SD --</div>
-        <div class="stat-pill" id="stat-rec" style="display:none;color:#ef4444;font-weight:700;">🔴 REC</div>
-        <div class="stat-pill" id="stat-time" style="color:#38bdf8;">🕒 --</div>
-        <div class="stat-pill" id="stat-heap" style="color:var(--jqm-text-muted);">🧠 --</div>
-        <div class="stat-pill" id="stat-uptime" style="color:#10b981;">⏱ 0s</div>
-        <div class="stat-pill" id="stat-ip" style="color:var(--jqm-text-muted);">🌐 --</div>
+        <div class="pill" id="stat-fps">⚡ 25 FPS</div>
+        <div class="pill" id="stat-rssi">📶 -- dBm</div>
+        <div class="pill" id="stat-sd" style="color:#10b981;">💾 SD --</div>
+        <div class="pill" id="stat-rec" style="display:none;color:#ef4444;font-weight:700;">🔴 REC</div>
+        <div class="pill" id="stat-time" style="color:#38bdf8;">🕒 --</div>
+        <div class="pill" id="stat-heap" style="color:var(--text-muted);">🧠 --</div>
+        <div class="pill" id="stat-uptime" style="color:#10b981;">⏱ 0s</div>
+        <div class="pill" id="stat-ip" style="color:var(--text-muted);">🌐 --</div>
       </div>
     </div>
 
-    <!-- ─── Active Section Panel (Moved Directly to Action Toolbar / Controls Area) ─── -->
-    <div class="desktop-right-pane sections-container">
+    <!-- ─── Control Center & Active Sections ─── -->
+    <div class="desktop-right-pane content-area">
 
-      <!-- ─── 1. CAMERA & SENSOR PANEL ─── -->
+      <!-- ─── 1. CAMERA SENSOR CONTROL CENTER (FULL CONTROL) ─── -->
       <section class="section-pane active" id="pane-cam">
-        <div class="ui-listview-inset">
-          <div class="ui-list-divider">
-            <span>Resolution & Stream Pacing</span>
-            <span class="ui-val-badge" id="val-fps-badge">25 FPS</span>
+        <div class="card">
+          <div class="card-header">
+            <span>⚡ Quick Camera Presets</span>
           </div>
-          
-          <div class="ui-field-contain">
-            <div class="ui-field-row">
-              <span class="ui-label">Frame Resolution</span>
-            </div>
+          <div class="presets-grid">
+            <div class="preset-chip" onclick="applyPreset('turbo')">⚡ Turbo 25fps</div>
+            <div class="preset-chip" onclick="applyPreset('night')">🌙 Night Vision</div>
+            <div class="preset-chip" onclick="applyPreset('daylight')">☀️ Daylight Pro</div>
+            <div class="preset-chip" onclick="applyPreset('hd')">📸 Ultra 2MP</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span>Stream Resolution & Pacing</span>
+            <span class="val-badge" id="val-fps-badge">25 FPS</span>
+          </div>
+
+          <div class="form-group">
+            <span class="form-label">Frame Resolution</span>
             <select id="sel-res" onchange="updateControl('framesize', this.value)">
-              <option value="10">UXGA (1600x1200)</option>
+              <option value="10">UXGA (1600x1200) - 2MP Full HD</option>
               <option value="9">SXGA (1280x1024)</option>
               <option value="8">XGA (1024x768)</option>
               <option value="7">SVGA (800x600)</option>
-              <option value="6" selected>VGA (640x480) - Real-time</option>
+              <option value="6" selected>VGA (640x480) - Real-time 25fps</option>
               <option value="5">CIF (400x296)</option>
-              <option value="4">QVGA (320x240)</option>
+              <option value="4">QVGA (320x240) - Fast low-bitrate</option>
             </select>
           </div>
 
-          <div class="ui-field-contain">
-            <div class="ui-field-row">
-              <span class="ui-label">Stream FPS Limit</span>
-              <span class="ui-val-badge" id="disp-fps">25</span>
+          <div class="form-group">
+            <div class="form-row">
+              <span class="form-label">Stream FPS Limit</span>
+              <span class="val-badge" id="disp-fps">25</span>
             </div>
             <input type="range" min="1" max="30" value="25" id="rng-fps" oninput="document.getElementById('disp-fps').innerText=this.value" onchange="updateControl('fps', this.value); document.getElementById('val-fps-badge').innerText=this.value+' FPS';">
           </div>
 
-          <div class="ui-field-contain">
-            <div class="ui-field-row">
-              <span class="ui-label">JPEG Quality (Lower = Better)</span>
-              <span class="ui-val-badge" id="disp-quality">14</span>
+          <div class="form-group">
+            <div class="form-row">
+              <span class="form-label">JPEG Quality (Lower = Higher Clarity)</span>
+              <span class="val-badge" id="disp-quality">14</span>
             </div>
             <input type="range" min="10" max="63" value="14" id="rng-quality" oninput="document.getElementById('disp-quality').innerText=this.value" onchange="updateControl('quality', this.value)">
           </div>
         </div>
 
-        <div class="ui-listview-inset">
-          <div class="ui-list-divider">Picture Adjustments</div>
-          
-          <div class="ui-field-contain">
-            <div class="ui-field-row">
-              <span class="ui-label">Brightness</span>
-              <span class="ui-val-badge" id="disp-bright">0</span>
+        <div class="card">
+          <div class="card-header">Color & Exposure Tuning</div>
+
+          <div class="form-group">
+            <div class="form-row">
+              <span class="form-label">Brightness</span>
+              <span class="val-badge" id="disp-bright">0</span>
             </div>
             <input type="range" min="-2" max="2" value="0" id="rng-bright" oninput="document.getElementById('disp-bright').innerText=this.value" onchange="updateControl('brightness', this.value)">
           </div>
 
-          <div class="ui-field-contain">
-            <div class="ui-field-row">
-              <span class="ui-label">Contrast</span>
-              <span class="ui-val-badge" id="disp-contrast">0</span>
+          <div class="form-group">
+            <div class="form-row">
+              <span class="form-label">Contrast</span>
+              <span class="val-badge" id="disp-contrast">0</span>
             </div>
             <input type="range" min="-2" max="2" value="0" id="rng-contrast" oninput="document.getElementById('disp-contrast').innerText=this.value" onchange="updateControl('contrast', this.value)">
           </div>
 
-          <div class="ui-field-contain">
-            <div class="ui-field-row">
-              <span class="ui-label">Saturation</span>
-              <span class="ui-val-badge" id="disp-sat">0</span>
+          <div class="form-group">
+            <div class="form-row">
+              <span class="form-label">Saturation</span>
+              <span class="val-badge" id="disp-sat">0</span>
             </div>
             <input type="range" min="-2" max="2" value="0" id="rng-sat" oninput="document.getElementById('disp-sat').innerText=this.value" onchange="updateControl('saturation', this.value)">
           </div>
 
-          <div class="ui-field-contain">
-            <div class="ui-field-row">
-              <span class="ui-label">Special Effect</span>
-            </div>
+          <div class="form-group">
+            <span class="form-label">Special Effect</span>
             <select id="sel-effect" onchange="updateControl('special_effect', this.value)">
-              <option value="0">No Effect</option>
+              <option value="0">No Effect (Natural)</option>
               <option value="1">Negative</option>
               <option value="2">Grayscale</option>
               <option value="3">Red Tint</option>
@@ -809,65 +901,132 @@ const char index_html[] PROGMEM = R"rawliteral(
             </select>
           </div>
 
-          <div class="ui-field-contain">
-            <div class="ui-field-row">
-              <span class="ui-label">White Balance Mode</span>
-            </div>
+          <div class="form-group">
+            <span class="form-label">White Balance Mode</span>
             <select id="sel-wb" onchange="updateControl('wb_mode', this.value)">
-              <option value="0">Auto</option>
-              <option value="1">Sunny</option>
+              <option value="0">Auto White Balance</option>
+              <option value="1">Sunny (Outdoor)</option>
               <option value="2">Cloudy</option>
-              <option value="3">Office</option>
-              <option value="4">Home</option>
+              <option value="3">Office (Fluorescent)</option>
+              <option value="4">Home (Incandescent)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">Advanced Sensor & Exposure Controls</div>
+
+          <div class="form-group">
+            <div class="form-row">
+              <span class="form-label">Auto Exposure Control (AEC)</span>
+              <div class="switch-toggle active" id="sw-aec" onclick="toggleSwitch('sw-aec', 'aec')"><div class="switch-slider"></div></div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <div class="form-row">
+              <span class="form-label">AEC2 Night/Day Exposure Mode</span>
+              <div class="switch-toggle" id="sw-aec2" onclick="toggleSwitch('sw-aec2', 'aec2')"><div class="switch-slider"></div></div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <div class="form-row">
+              <span class="form-label">Auto Gain Control (AGC)</span>
+              <div class="switch-toggle active" id="sw-agc" onclick="toggleSwitch('sw-agc', 'agc')"><div class="switch-slider"></div></div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <span class="form-label">Gain Ceiling (Max Sensitivity Boost)</span>
+            <select id="sel-gainceiling" onchange="updateControl('gainceiling', this.value)">
+              <option value="0">2x</option>
+              <option value="1">4x</option>
+              <option value="2">8x</option>
+              <option value="3">16x</option>
+              <option value="4">32x</option>
+              <option value="5">64x</option>
+              <option value="6">128x (Extreme Low-Light)</option>
             </select>
           </div>
 
-          <div class="ui-field-contain">
-            <div class="ui-field-row">
-              <span class="ui-label">Vertical Flip</span>
-              <div class="ui-flipswitch" id="flip-vflip" onclick="toggleFlipswitch('flip-vflip', 'vflip')">
-                <div class="ui-flipswitch-slider"></div>
-              </div>
+          <div class="form-group">
+            <div class="form-row">
+              <span class="form-label">Auto White Balance Gain (AWB Gain)</span>
+              <div class="switch-toggle active" id="sw-awb-gain" onclick="toggleSwitch('sw-awb-gain', 'awb_gain')"><div class="switch-slider"></div></div>
             </div>
           </div>
 
-          <div class="ui-field-contain">
-            <div class="ui-field-row">
-              <span class="ui-label">Horizontal Mirror</span>
-              <div class="ui-flipswitch" id="flip-hmirror" onclick="toggleFlipswitch('flip-hmirror', 'hmirror')">
-                <div class="ui-flipswitch-slider"></div>
-              </div>
+          <div class="form-group">
+            <div class="form-row">
+              <span class="form-label">Black Pixel Correction (BPC)</span>
+              <div class="switch-toggle" id="sw-bpc" onclick="toggleSwitch('sw-bpc', 'bpc')"><div class="switch-slider"></div></div>
             </div>
           </div>
 
-          <div class="ui-field-contain">
-            <button class="ui-btn ui-btn-block ui-btn-success" onclick="saveCameraDefaults()">💾 Save Stream Defaults to Flash</button>
+          <div class="form-group">
+            <div class="form-row">
+              <span class="form-label">White Pixel Correction (WPC)</span>
+              <div class="switch-toggle active" id="sw-wpc" onclick="toggleSwitch('sw-wpc', 'wpc')"><div class="switch-slider"></div></div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <div class="form-row">
+              <span class="form-label">Lens Distortion Correction (LENC)</span>
+              <div class="switch-toggle" id="sw-lenc" onclick="toggleSwitch('sw-lenc', 'lenc')"><div class="switch-slider"></div></div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <div class="form-row">
+              <span class="form-label">Vertical Flip</span>
+              <div class="switch-toggle" id="sw-vflip" onclick="toggleSwitch('sw-vflip', 'vflip')"><div class="switch-slider"></div></div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <div class="form-row">
+              <span class="form-label">Horizontal Mirror</span>
+              <div class="switch-toggle" id="sw-hmirror" onclick="toggleSwitch('sw-hmirror', 'hmirror')"><div class="switch-slider"></div></div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <div class="form-row">
+              <span class="form-label">Color Bar Test Pattern</span>
+              <div class="switch-toggle" id="sw-colorbar" onclick="toggleSwitch('sw-colorbar', 'colorbar')"><div class="switch-slider"></div></div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <button class="btn btn-block btn-success" onclick="saveCameraDefaults()">💾 Save Stream Defaults to Flash</button>
           </div>
         </div>
       </section>
 
-      <!-- ─── 2. SD CARD FILE MANAGER PANEL ─── -->
+      <!-- ─── 2. SD CARD FILE MANAGER (RECURSIVE DELETION FIXED) ─── -->
       <section class="section-pane" id="pane-sd">
-        <div class="ui-listview-inset">
-          <div class="ui-list-divider">
+        <div class="card">
+          <div class="card-header">
             <span>SD Card Storage</span>
-            <span id="sd-usage-text" class="ui-val-badge">Loading...</span>
+            <span id="sd-usage-text" class="val-badge">Loading...</span>
           </div>
-          <div class="ui-field-contain">
-            <div class="fm-progress-bar"><div class="fm-progress-fill" id="sd-progress-fill"></div></div>
+          <div class="form-group">
+            <div class="progress-bar"><div class="progress-fill" id="sd-progress-fill"></div></div>
           </div>
         </div>
 
-        <div class="ui-listview-inset" style="display:flex;flex-direction:column;">
+        <div class="card" style="display:flex;flex-direction:column;">
           <div class="fm-toolbar">
             <div class="fm-breadcrumbs" id="fm-breadcrumbs">
               <span class="fm-crumb" onclick="loadDirectory('/')">📁 Root</span>
             </div>
             <div style="display:flex;gap:0.35rem;">
-              <button class="ui-btn" id="btn-view-mode" onclick="toggleViewMode()" title="Toggle View">⊞ Grid</button>
-              <button class="ui-btn" onclick="navigateUpDir()" title="Parent Directory">⬆️ Up</button>
-              <button class="ui-btn" onclick="selectAllFiles()" title="Select All">☑️ All</button>
-              <button class="ui-btn" onclick="loadDirectory(currentFmPath)" title="Refresh">🔄</button>
+              <button class="btn" id="btn-view-mode" onclick="toggleViewMode()" title="Toggle View">⊞ Grid</button>
+              <button class="btn" onclick="navigateUpDir()" title="Parent Directory">⬆️ Up</button>
+              <button class="btn" onclick="selectAllFiles()" title="Select All">☑️ All</button>
+              <button class="btn" onclick="loadDirectory(currentFmPath)" title="Refresh">🔄</button>
             </div>
           </div>
 
@@ -875,104 +1034,147 @@ const char index_html[] PROGMEM = R"rawliteral(
           <div class="batch-bar" id="batch-bar">
             <span id="batch-count" style="font-size:0.82rem;font-weight:700;color:#38bdf8;">0 selected</span>
             <div style="display:flex;gap:0.35rem;">
-              <button class="ui-btn ui-btn-danger" onclick="deleteSelectedFiles()">🗑️ Delete</button>
-              <button class="ui-btn" onclick="clearSelection()">✕ Cancel</button>
+              <button class="btn btn-danger" onclick="deleteSelectedFiles()">🗑️ Delete Selected</button>
+              <button class="btn" onclick="clearSelection()">✕ Cancel</button>
             </div>
           </div>
 
           <!-- Files Grid / List -->
           <div id="fm-container" style="min-height:260px;overflow-y:auto;">
-            <div style="text-align:center;padding:2.5rem;color:var(--jqm-text-muted);">Loading files...</div>
+            <div style="text-align:center;padding:2.5rem;color:var(--text-muted);">Loading files...</div>
           </div>
 
-          <div class="ui-field-contain" style="border-top:1px solid var(--jqm-inset-border);display:flex;justify-content:space-between;align-items:center;">
-            <span class="ui-subtext">Format permanently erases SD card</span>
-            <button class="ui-btn ui-btn-danger" onclick="formatSDCard()">🧹 Format SD</button>
+          <div class="form-group" style="border-top:1px solid var(--card-border);display:flex;justify-content:space-between;align-items:center;">
+            <span class="form-hint">Erase & format all files on SD card</span>
+            <button class="btn btn-danger" onclick="formatSDCard()">🧹 Format SD Card</button>
           </div>
         </div>
       </section>
 
-      <!-- ─── 3. TELEGRAM BOT PANEL ─── -->
-      <section class="section-pane" id="pane-tg">
-        <div class="ui-listview-inset">
-          <div class="ui-list-divider">Telegram Bot Configuration</div>
-          
-          <div class="ui-field-contain">
-            <span class="ui-label">Bot Token</span>
-            <input type="password" id="cfg-tg-token" placeholder="8967102688:AAHEieQC2_ZHa9ci0DiPsc3O4uLclWdLJ-k">
-            <span class="ui-subtext">Obtain from @BotFather on Telegram</span>
+      <!-- ─── 3. XIAOZHI AI AGENT & TELEGRAM CONSOLE ─── -->
+      <section class="section-pane" id="pane-ai">
+        <div class="card">
+          <div class="card-header">
+            <span>🤖 XiaoZhi AI (小智) Live Assistant</span>
+            <span class="val-badge">Agent Active</span>
           </div>
 
-          <div class="ui-field-contain">
-            <span class="ui-label">Authorized Chat IDs</span>
-            <input type="text" id="cfg-tg-chat" placeholder="318862528, 987654321">
-            <span class="ui-subtext">Comma-separated user or group chat IDs</span>
-          </div>
+          <div class="form-group">
+            <div class="chat-box" id="ai-chat-box">
+              <div class="chat-bubble ai">✨ Hello! I am XiaoZhi AI (小智), your edge AI agent running on ESP32-CAM.
+I have full control over camera capture, flash spotlight, SD card storage, and system health. You can talk to me naturally right here or from Telegram!</div>
+            </div>
 
-          <div class="ui-field-contain">
-            <button class="ui-btn ui-btn-block ui-btn-accent" onclick="saveSettings()">💾 Save Telegram Config</button>
+            <!-- Quick Action Chips -->
+            <div class="prompt-chips">
+              <div class="chip" onclick="sendAiPrompt('take a photo')">📸 Take Photo</div>
+              <div class="chip" onclick="sendAiPrompt('turn on flash')">💡 Flash On</div>
+              <div class="chip" onclick="sendAiPrompt('flash off')">💡 Flash Off</div>
+              <div class="chip" onclick="sendAiPrompt('status report')">📊 System Status</div>
+              <div class="chip" onclick="sendAiPrompt('check sd storage')">💾 SD Card</div>
+              <div class="chip" onclick="sendAiPrompt('start record')">🎬 Start Record</div>
+              <div class="chip" onclick="sendAiPrompt('who are you')">ℹ️ Who Are You</div>
+            </div>
+
+            <div style="display:flex;gap:0.4rem;margin-top:0.4rem;">
+              <input type="text" id="ai-input" placeholder="Ask XiaoZhi AI or send command..." onkeydown="if(event.key==='Enter') sendCustomPrompt()">
+              <button class="btn btn-accent" onclick="sendCustomPrompt()">Send</button>
+            </div>
           </div>
         </div>
 
-        <div class="ui-listview-inset">
-          <div class="ui-list-divider">🧪 Live TLS & HTTPS Diagnostics</div>
+        <div class="card">
+          <div class="card-header">Telegram Bot Integration</div>
+          
+          <div class="form-group">
+            <span class="form-label">Bot Token</span>
+            <input type="password" id="cfg-tg-token" placeholder="8967102688:AAHEieQC2_ZHa9ci0DiPsc3O4uLclWdLJ-k">
+            <span class="form-hint">Obtain from @BotFather on Telegram</span>
+          </div>
 
-          <div class="ui-field-contain">
+          <div class="form-group">
+            <span class="form-label">Authorized Chat IDs</span>
+            <input type="text" id="cfg-tg-chat" placeholder="318862528, 987654321">
+            <span class="form-hint">Comma-separated user or group chat IDs</span>
+          </div>
+
+          <div class="form-group">
+            <button class="btn btn-block btn-accent" onclick="saveSettings()">💾 Save Telegram Config</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">🧪 Live TLS & HTTPS Diagnostics</div>
+
+          <div class="form-group">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;">
-              <button class="ui-btn ui-btn-accent" onclick="testRawHTTPS()">🔒 Test TLS Handshake</button>
-              <button class="ui-btn" onclick="sendTelegramTest('msg')">✉️ Send Text Test</button>
+              <button class="btn btn-accent" onclick="testRawHTTPS()">🔒 Test TLS Handshake</button>
+              <button class="btn" onclick="sendTelegramTest('msg')">✉️ Send Text Test</button>
             </div>
-            <button class="ui-btn ui-btn-block" style="margin-top:0.4rem;" onclick="sendTelegramTest('photo')">📸 Send Photo Test</button>
+            <button class="btn btn-block" style="margin-top:0.4rem;" onclick="sendTelegramTest('photo')">📸 Send Photo Test</button>
 
             <div id="tg-diag-box" style="display:none;margin-top:0.6rem;font-size:0.75rem;background:#060a12;border:1px solid rgba(56,189,248,0.25);padding:0.65rem;border-radius:6px;white-space:pre-wrap;font-family:monospace;color:#38bdf8;"></div>
           </div>
-
-          <div class="ui-field-contain">
-            <span class="ui-label">Supported Bot Commands</span>
-            <div style="font-size:0.78rem;color:var(--jqm-text-muted);display:flex;flex-direction:column;gap:0.25rem;">
-              <div><code>/photo</code> - Capture snapshot and return photo</div>
-              <div><code>/flash on</code> | <code>/flash off</code> - Toggle illumination LED</div>
-              <div><code>/status</code> - Uptime, WiFi RSSI, Heap & Clock info</div>
-              <div><code>/help</code> - List all commands</div>
-            </div>
-          </div>
         </div>
       </section>
 
-      <!-- ─── 4. SYSTEM & NETWORK SETTINGS PANEL ─── -->
+      <!-- ─── 4. SYSTEM & NETWORK SETTINGS ─── -->
       <section class="section-pane" id="pane-sys">
-        <div class="ui-listview-inset">
-          <div class="ui-list-divider">Network & Hostname</div>
-          
-          <div class="ui-field-contain">
-            <span class="ui-label">mDNS Hostname</span>
-            <input type="text" id="cfg-mdns" placeholder="esp32cam">
-            <span class="ui-subtext">Access via http://esp32cam.local</span>
+        <div class="card">
+          <div class="card-header">24/7 SD Video Recording Engine</div>
+
+          <div class="form-group">
+            <div class="form-row">
+              <span class="form-label">Enable Background Recording</span>
+              <div class="switch-toggle active" id="sw-rec-enable" onclick="toggleSwitch('sw-rec-enable', 'rec_enabled')"><div class="switch-slider"></div></div>
+            </div>
+            <span class="form-hint">Captures continuous Motion-JPEG AVI video segments</span>
           </div>
 
-          <div class="ui-field-contain">
-            <span class="ui-label">WiFi Network Name (SSID)</span>
-            <input type="text" id="cfg-ssid" placeholder="FTTH">
-          </div>
-
-          <div class="ui-field-contain">
-            <span class="ui-label">WiFi Password</span>
-            <input type="password" id="cfg-pass" placeholder="••••••••">
-          </div>
-
-          <div class="ui-field-contain">
-            <button class="ui-btn ui-btn-block ui-btn-accent" onclick="saveSettings()">💾 Save WiFi & Hostname</button>
+          <div class="form-group">
+            <span class="form-label">Segment Duration</span>
+            <select id="sel-rec-interval" onchange="updateControl('rec_interval', this.value)">
+              <option value="5">5 Minutes</option>
+              <option value="10">10 Minutes</option>
+              <option value="15" selected>15 Minutes (Recommended)</option>
+              <option value="30">30 Minutes</option>
+              <option value="60">60 Minutes</option>
+            </select>
           </div>
         </div>
 
-        <div class="ui-listview-inset">
-          <div class="ui-list-divider">
-            <span>NTP System Clock</span>
-            <span class="ui-val-badge" id="cfg-clock-display">--</span>
+        <div class="card">
+          <div class="card-header">Network & Hostname</div>
+          
+          <div class="form-group">
+            <span class="form-label">mDNS Hostname</span>
+            <input type="text" id="cfg-mdns" placeholder="esp32cam">
+            <span class="form-hint">Access via http://esp32cam.local</span>
           </div>
 
-          <div class="ui-field-contain">
-            <span class="ui-label">Timezone</span>
+          <div class="form-group">
+            <span class="form-label">WiFi Network Name (SSID)</span>
+            <input type="text" id="cfg-ssid" placeholder="FTTH">
+          </div>
+
+          <div class="form-group">
+            <span class="form-label">WiFi Password</span>
+            <input type="password" id="cfg-pass" placeholder="••••••••">
+          </div>
+
+          <div class="form-group">
+            <button class="btn btn-block btn-accent" onclick="saveSettings()">💾 Save WiFi & Hostname</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span>NTP System Clock</span>
+            <span class="val-badge" id="cfg-clock-display">--</span>
+          </div>
+
+          <div class="form-group">
+            <span class="form-label">Timezone</span>
             <select id="cfg-ntp-offset">
               <option value="19800">UTC +05:30 (India Standard Time - IST)</option>
               <option value="0">UTC +00:00 (GMT / UTC - London)</option>
@@ -992,41 +1194,39 @@ const char index_html[] PROGMEM = R"rawliteral(
             </select>
           </div>
 
-          <div class="ui-field-contain">
-            <div class="ui-field-row">
-              <span class="ui-label">Daylight Saving (+1h)</span>
-              <div class="ui-flipswitch" id="flip-dst" onclick="toggleFlipswitch('flip-dst')">
-                <div class="ui-flipswitch-slider"></div>
-              </div>
+          <div class="form-group">
+            <div class="form-row">
+              <span class="form-label">Daylight Saving (+1h)</span>
+              <div class="switch-toggle" id="sw-dst" onclick="toggleSwitch('sw-dst')"><div class="switch-slider"></div></div>
             </div>
           </div>
 
-          <div class="ui-field-contain">
-            <span class="ui-label">Primary NTP Server</span>
+          <div class="form-group">
+            <span class="form-label">Primary NTP Server</span>
             <input type="text" id="cfg-ntp1" placeholder="pool.ntp.org">
           </div>
 
-          <div class="ui-field-contain">
-            <button class="ui-btn ui-btn-block ui-btn-success" onclick="saveSettings()">💾 Save & Sync Clock</button>
+          <div class="form-group">
+            <button class="btn btn-block btn-success" onclick="saveSettings()">💾 Save & Sync Clock</button>
           </div>
         </div>
 
-        <div class="ui-listview-inset">
-          <div class="ui-list-divider">Firmware OTA Flash</div>
-          <div class="ui-field-contain">
-            <span class="ui-label">Select .bin Firmware File</span>
+        <div class="card">
+          <div class="card-header">Firmware OTA Flash</div>
+          <div class="form-group">
+            <span class="form-label">Select .bin Firmware File</span>
             <input type="file" id="ota-file" accept=".bin">
-            <div class="fm-progress-bar"><div class="fm-progress-fill" id="ota-progress"></div></div>
-            <button class="ui-btn ui-btn-block ui-btn-accent" style="margin-top:0.5rem;" onclick="uploadOTA()">⬆️ Flash Firmware Now</button>
+            <div class="progress-bar"><div class="progress-fill" id="ota-progress"></div></div>
+            <button class="btn btn-block btn-accent" style="margin-top:0.5rem;" onclick="uploadOTA()">⬆️ Flash Firmware Now</button>
           </div>
         </div>
 
-        <div class="ui-listview-inset">
-          <div class="ui-list-divider">Device Management</div>
-          <div class="ui-field-contain">
+        <div class="card">
+          <div class="card-header">Device Reboot & Recovery</div>
+          <div class="form-group">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;">
-              <button class="ui-btn ui-btn-danger" onclick="restartDevice('soft')">🔄 Soft Reboot</button>
-              <button class="ui-btn ui-btn-danger" onclick="restartDevice('erase_nvs')">⚠️ Erase NVS</button>
+              <button class="btn btn-danger" onclick="restartDevice('soft')">🔄 Soft Reboot</button>
+              <button class="btn btn-danger" onclick="restartDevice('erase_nvs')">⚠️ Erase NVS</button>
             </div>
           </div>
         </div>
@@ -1036,40 +1236,40 @@ const char index_html[] PROGMEM = R"rawliteral(
 
   </div>
 
-  <!-- ─── Persistent Bottom Sub-Navbar (jQuery Mobile Style) ─── -->
-  <nav class="ui-subnav" id="stream-subnav">
-    <button class="ui-subnav-btn ui-btn-active" onclick="switchSection('cam')" id="subnav-btn-cam">
-      <span class="subnav-icon">🎛️</span>
-      <span>Camera</span>
+  <!-- ─── Persistent Bottom Navigation Bar ─── -->
+  <nav class="bottom-nav" id="stream-subnav">
+    <button class="nav-btn active" onclick="switchSection('cam')" id="nav-btn-cam">
+      <span class="nav-icon">🎛️</span>
+      <span>Controls</span>
     </button>
-    <button class="ui-subnav-btn" onclick="switchSection('sd')" id="subnav-btn-sd">
-      <span class="subnav-icon">📁</span>
+    <button class="nav-btn" onclick="switchSection('sd')" id="nav-btn-sd">
+      <span class="nav-icon">📁</span>
       <span>SD Card</span>
     </button>
-    <button class="ui-subnav-btn" onclick="switchSection('tg')" id="subnav-btn-tg">
-      <span class="subnav-icon">🤖</span>
-      <span>Telegram</span>
+    <button class="nav-btn" onclick="switchSection('ai')" id="nav-btn-ai">
+      <span class="nav-icon">🤖</span>
+      <span>XiaoZhi AI</span>
     </button>
-    <button class="ui-subnav-btn" onclick="switchSection('sys')" id="subnav-btn-sys">
-      <span class="subnav-icon">⚙️</span>
-      <span>Settings</span>
+    <button class="nav-btn" onclick="switchSection('sys')" id="nav-btn-sys">
+      <span class="nav-icon">⚙️</span>
+      <span>System</span>
     </button>
   </nav>
 
   <!-- ─── Lightbox Modal for Media Preview ─── -->
-  <div class="ui-popup-backdrop" id="modal-lightbox" onclick="closeLightbox()">
-    <div class="ui-popup" onclick="event.stopPropagation()">
-      <div class="ui-popup-header">
+  <div class="modal-backdrop" id="modal-lightbox" onclick="closeLightbox()">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-header">
         <span id="lb-title" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px;">Media Viewer</span>
-        <button class="ui-btn ui-btn-icon-only" onclick="closeLightbox()" style="width:30px;height:30px;font-size:0.9rem;">✕</button>
+        <button class="btn btn-icon" onclick="closeLightbox()" style="width:30px;height:30px;font-size:0.9rem;">✕</button>
       </div>
-      <div class="ui-popup-body" id="lb-body">
+      <div class="modal-body" id="lb-body">
         <img id="lb-img" src="" alt="Snapshot" style="width:100%;border-radius:8px;object-fit:contain;max-height:55vh;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.4rem;">
-          <span id="lb-meta" class="ui-subtext">Loading...</span>
+          <span id="lb-meta" class="form-hint">Loading...</span>
           <div style="display:flex;gap:0.4rem;">
-            <a class="ui-btn ui-btn-accent" id="lb-dl" href="#" download>⬇️ Download</a>
-            <button class="ui-btn ui-btn-danger" id="lb-del" onclick="deleteLightboxFile()">🗑️ Delete</button>
+            <a class="btn btn-accent" id="lb-dl" href="#" download>⬇️ Download</a>
+            <button class="btn btn-danger" id="lb-del" onclick="deleteLightboxFile()">🗑️ Delete</button>
           </div>
         </div>
       </div>
@@ -1101,14 +1301,13 @@ const char index_html[] PROGMEM = R"rawliteral(
       return `${s}s`;
     }
 
-    // ─── Section Switcher (Camera, SD Card, Telegram, Settings) ──
+    // ─── Section Switcher ───────────────────────────────────────
     function switchSection(secId) {
       currentSection = secId;
 
-      // Update button active state
-      ['cam', 'sd', 'tg', 'sys'].forEach(s => {
-        const btn = document.getElementById('subnav-btn-' + s);
-        if (btn) btn.classList.toggle('ui-btn-active', s === secId);
+      ['cam', 'sd', 'ai', 'sys'].forEach(s => {
+        const btn = document.getElementById('nav-btn-' + s);
+        if (btn) btn.classList.toggle('active', s === secId);
         const pane = document.getElementById('pane-' + s);
         if (pane) pane.classList.toggle('active', s === secId);
       });
@@ -1192,7 +1391,7 @@ const char index_html[] PROGMEM = R"rawliteral(
             const heapKB  = Math.round(d.heap / 1024);
             const psramKB = Math.round(d.psram / 1024);
             document.getElementById('stat-heap').innerText = `🧠 ${heapKB}KB / ${psramKB}KB`;
-            document.getElementById('stat-heap').style.color = heapKB < 30 ? 'var(--jqm-danger)' : 'var(--jqm-text-muted)';
+            document.getElementById('stat-heap').style.color = heapKB < 30 ? 'var(--danger)' : 'var(--text-muted)';
           }
 
           // SD Card status
@@ -1230,12 +1429,52 @@ const char index_html[] PROGMEM = R"rawliteral(
       fetch(`/control?var=${varName}&val=${val}`).catch(() => {});
     }
 
-    function toggleFlipswitch(elId, varName) {
+    function toggleSwitch(elId, varName) {
       const el = document.getElementById(elId);
       const isNowActive = !el.classList.contains('active');
       el.classList.toggle('active', isNowActive);
       if (varName) {
         updateControl(varName, isNowActive ? 1 : 0);
+      }
+    }
+
+    function applyPreset(name) {
+      if (name === 'turbo') {
+        updateControl('framesize', 6);
+        updateControl('fps', 25);
+        updateControl('quality', 14);
+        document.getElementById('sel-res').value = 6;
+        document.getElementById('rng-fps').value = 25;
+        document.getElementById('disp-fps').innerText = '25';
+        document.getElementById('val-fps-badge').innerText = '25 FPS';
+        showToast('⚡ Preset: Turbo 25fps activated');
+      } else if (name === 'night') {
+        updateControl('framesize', 6);
+        updateControl('gainceiling', 6);
+        updateControl('aec2', 1);
+        updateControl('brightness', 1);
+        document.getElementById('sel-gainceiling').value = 6;
+        document.getElementById('sw-aec2').classList.add('active');
+        document.getElementById('rng-bright').value = 1;
+        document.getElementById('disp-bright').innerText = '1';
+        showToast('🌙 Preset: Night Vision activated (128x Gain)');
+      } else if (name === 'daylight') {
+        updateControl('wb_mode', 1);
+        updateControl('brightness', 0);
+        updateControl('contrast', 1);
+        document.getElementById('sel-wb').value = 1;
+        document.getElementById('rng-bright').value = 0;
+        document.getElementById('disp-bright').innerText = '0';
+        document.getElementById('rng-contrast').value = 1;
+        document.getElementById('disp-contrast').innerText = '1';
+        showToast('☀️ Preset: Daylight Pro activated');
+      } else if (name === 'hd') {
+        updateControl('framesize', 10);
+        updateControl('quality', 10);
+        document.getElementById('sel-res').value = 10;
+        document.getElementById('rng-quality').value = 10;
+        document.getElementById('disp-quality').innerText = '10';
+        showToast('📸 Preset: Ultra 2MP HD activated');
       }
     }
 
@@ -1251,8 +1490,8 @@ const char index_html[] PROGMEM = R"rawliteral(
         .then(st => {
           const isFlashOn = (st === '1');
           document.getElementById('btn-flash').innerText = isFlashOn ? '💡 Flash ON' : '💡 Flash OFF';
-          document.getElementById('btn-flash').classList.toggle('ui-btn-accent', isFlashOn);
-          document.getElementById('header-btn-flash').classList.toggle('ui-btn-accent', isFlashOn);
+          document.getElementById('btn-flash').classList.toggle('btn-accent', isFlashOn);
+          document.getElementById('header-btn-flash').classList.toggle('btn-accent', isFlashOn);
           showToast(`💡 Flash light is ${isFlashOn ? 'ON' : 'OFF'}`);
         });
     }
@@ -1266,7 +1505,7 @@ const char index_html[] PROGMEM = R"rawliteral(
         });
     }
 
-    // ─── SD Card File Manager ───────────────────────────────────
+    // ─── SD Card File Manager (Fixed Recursive Delete) ───────────
     function toggleViewMode() {
       viewMode = (viewMode === 'grid') ? 'list' : 'grid';
       document.getElementById('btn-view-mode').innerText = (viewMode === 'grid') ? '⊞ Grid' : '☰ List';
@@ -1293,7 +1532,7 @@ const char index_html[] PROGMEM = R"rawliteral(
       currentFmPath = path || '/';
       updateBreadcrumbs(currentFmPath);
       const container = document.getElementById('fm-container');
-      container.innerHTML = '<div style="text-align:center;padding:2.5rem;color:var(--jqm-text-muted);">Loading files...</div>';
+      container.innerHTML = '<div style="text-align:center;padding:2.5rem;color:var(--text-muted);">Loading files...</div>';
 
       fetch(`/api/sdcard/list?path=${encodeURIComponent(currentFmPath)}`)
         .then(r => r.json())
@@ -1304,7 +1543,7 @@ const char index_html[] PROGMEM = R"rawliteral(
           renderFileList();
         })
         .catch(() => {
-          container.innerHTML = '<div style="text-align:center;padding:2.5rem;color:var(--jqm-danger);">Failed to load SD contents</div>';
+          container.innerHTML = '<div style="text-align:center;padding:2.5rem;color:var(--danger);">Failed to load SD contents</div>';
         });
     }
 
@@ -1317,7 +1556,7 @@ const char index_html[] PROGMEM = R"rawliteral(
       parts.forEach(p => {
         cur += '/' + p;
         const target = cur;
-        bc.innerHTML += ` <span style="color:var(--jqm-text-muted);">></span> <span class="fm-crumb" onclick="loadDirectory('${target}')">${p}</span>`;
+        bc.innerHTML += ` <span style="color:var(--text-muted);">></span> <span class="fm-crumb" onclick="loadDirectory('${target}')">${p}</span>`;
       });
     }
 
@@ -1331,7 +1570,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     function renderFileList() {
       const container = document.getElementById('fm-container');
       if (currentFiles.length === 0) {
-        container.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--jqm-text-muted);">📁 Empty Directory</div>';
+        container.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--text-muted);">📁 Empty Directory</div>';
         return;
       }
 
@@ -1353,8 +1592,8 @@ const char index_html[] PROGMEM = R"rawliteral(
               <div class="fm-card-title" title="${f.name}">${f.name}</div>
               <div class="fm-card-meta">${szStr}</div>
               <div class="fm-card-actions" onclick="event.stopPropagation()">
-                ${!isDir ? `<a class="ui-btn ui-btn-icon-only" href="/api/sdcard/download?name=${encodeURIComponent(f.path)}" title="Download" style="width:28px;height:28px;font-size:0.75rem;">⬇️</a>` : ''}
-                <button class="ui-btn ui-btn-icon-only ui-btn-danger" onclick="deleteSingleFile('${f.path}')" title="Delete" style="width:28px;height:28px;font-size:0.75rem;">🗑️</button>
+                ${!isDir ? `<a class="btn btn-icon" href="/api/sdcard/download?name=${encodeURIComponent(f.path)}" title="Download" style="width:28px;height:28px;font-size:0.75rem;">⬇️</a>` : ''}
+                <button class="btn btn-icon btn-danger" onclick="deleteItem('${f.path}', ${isDir})" title="Delete" style="width:28px;height:28px;font-size:0.75rem;">🗑️</button>
               </div>
             </div>`;
         });
@@ -1376,8 +1615,8 @@ const char index_html[] PROGMEM = R"rawliteral(
               <div class="fm-row-name">${f.name}</div>
               <div class="fm-row-size">${szStr}</div>
               <div style="display:flex;gap:0.3rem;" onclick="event.stopPropagation()">
-                ${!isDir ? `<a class="ui-btn ui-btn-icon-only" href="/api/sdcard/download?name=${encodeURIComponent(f.path)}" title="Download" style="width:28px;height:28px;font-size:0.75rem;">⬇️</a>` : ''}
-                <button class="ui-btn ui-btn-icon-only ui-btn-danger" onclick="deleteSingleFile('${f.path}')" title="Delete" style="width:28px;height:28px;font-size:0.75rem;">🗑️</button>
+                ${!isDir ? `<a class="btn btn-icon" href="/api/sdcard/download?name=${encodeURIComponent(f.path)}" title="Download" style="width:28px;height:28px;font-size:0.75rem;">⬇️</a>` : ''}
+                <button class="btn btn-icon btn-danger" onclick="deleteItem('${f.path}', ${isDir})" title="Delete" style="width:28px;height:28px;font-size:0.75rem;">🗑️</button>
               </div>
             </div>`;
         });
@@ -1412,7 +1651,7 @@ const char index_html[] PROGMEM = R"rawliteral(
 
     function deleteLightboxFile() {
       if (!activeLightboxPath) return;
-      deleteSingleFile(activeLightboxPath);
+      deleteItem(activeLightboxPath, false);
       closeLightbox();
     }
 
@@ -1448,38 +1687,48 @@ const char index_html[] PROGMEM = R"rawliteral(
       }
     }
 
-    function deleteSingleFile(path) {
-      if (!confirm(`Delete ${path}?`)) return;
+    function deleteItem(path, isDir) {
+      const promptMsg = isDir ? `Permanently delete folder "${path}" and ALL files inside it?` : `Delete "${path}"?`;
+      if (!confirm(promptMsg)) return;
+
+      showToast(`🗑️ Deleting ${isDir ? 'folder' : 'file'}...`);
       fetch(`/api/sdcard/delete?name=${encodeURIComponent(path)}`)
         .then(r => r.json())
         .then(d => {
           if (d.ok) {
-            showToast('🗑️ File deleted');
+            showToast(`🗑️ Successfully deleted ${path}`);
             loadDirectory(currentFmPath);
             loadStorageInfo();
-          } else showToast('❌ Delete failed');
-        });
+          } else {
+            showToast(`❌ Delete failed: ${d.err || 'error'}`);
+          }
+        })
+        .catch(() => showToast('❌ Network error during delete'));
     }
 
     function deleteSelectedFiles() {
       if (selectedFiles.size === 0) return;
-      if (!confirm(`Delete all ${selectedFiles.size} selected items?`)) return;
+      if (!confirm(`Permanently delete all ${selectedFiles.size} selected items (including folders and files)?`)) return;
+
       const names = Array.from(selectedFiles).join(',');
+      showToast(`🗑️ Deleting ${selectedFiles.size} items...`);
       fetch(`/api/sdcard/delete?name=${encodeURIComponent(names)}`)
         .then(r => r.json())
         .then(d => {
           if (d.ok) {
-            showToast(`🗑️ ${selectedFiles.size} items deleted`);
+            showToast(`🗑️ Deleted ${d.deleted || selectedFiles.size} items!`);
             selectedFiles.clear();
             updateBatchBar();
             loadDirectory(currentFmPath);
             loadStorageInfo();
-          } else showToast('❌ Batch delete failed');
+          } else {
+            showToast('❌ Batch delete failed');
+          }
         });
     }
 
     function formatSDCard() {
-      if (!confirm('⚠️ WARNING: Erase and format ALL files on SD card?')) return;
+      if (!confirm('⚠️ CRITICAL WARNING: Erase and reformat ALL files on the SD card?')) return;
       showToast('🧹 Formatting SD card...');
       fetch('/api/sdcard/format')
         .then(r => r.json())
@@ -1490,6 +1739,43 @@ const char index_html[] PROGMEM = R"rawliteral(
             loadStorageInfo();
           } else showToast('❌ Format failed');
         });
+    }
+
+    // ─── XiaoZhi AI Web Chat ────────────────────────────────────
+    function sendAiPrompt(promptText) {
+      const box = document.getElementById('ai-chat-box');
+
+      // Append user bubble
+      const u = document.createElement('div');
+      u.className = 'chat-bubble user';
+      u.innerText = promptText;
+      box.appendChild(u);
+      box.scrollTop = box.scrollHeight;
+
+      // Send to XiaoZhi AI endpoint
+      fetch(`/api/xiaozhi/chat?q=${encodeURIComponent(promptText)}`)
+        .then(r => r.json())
+        .then(d => {
+          const a = document.createElement('div');
+          a.className = 'chat-bubble ai';
+          a.innerText = d.reply || 'No response from XiaoZhi AI';
+          box.appendChild(a);
+          box.scrollTop = box.scrollHeight;
+        })
+        .catch(() => {
+          const a = document.createElement('div');
+          a.className = 'chat-bubble ai';
+          a.innerText = '❌ Error communicating with XiaoZhi AI';
+          box.appendChild(a);
+        });
+    }
+
+    function sendCustomPrompt() {
+      const inp = document.getElementById('ai-input');
+      const val = inp.value.trim();
+      if (!val) return;
+      inp.value = '';
+      sendAiPrompt(val);
     }
 
     // ─── Telegram Diagnostics ───────────────────────────────────
@@ -1510,13 +1796,13 @@ const char index_html[] PROGMEM = R"rawliteral(
                            + `🤖 Response: ${d.resp}`;
             showToast(`✅ TLS Handshake OK (${d.tls_ms}ms)`);
           } else {
-            diag.style.color = 'var(--jqm-danger)';
+            diag.style.color = 'var(--danger)';
             diag.innerText = `❌ TLS Handshake FAILED\nError: ${d.err}\nTime: ${d.time || '--'}`;
             showToast(`❌ TLS Handshake Failed: ${d.err}`);
           }
         })
         .catch(() => {
-          diag.style.color = 'var(--jqm-danger)';
+          diag.style.color = 'var(--danger)';
           diag.innerText = '❌ Network request error while running TLS diagnostic';
           showToast('❌ Network error testing HTTPS');
         });
@@ -1544,11 +1830,23 @@ const char index_html[] PROGMEM = R"rawliteral(
           if (d.ntp_server1) document.getElementById('cfg-ntp1').value = d.ntp_server1;
           if (d.ntp_offset !== undefined) document.getElementById('cfg-ntp-offset').value = d.ntp_offset;
           if (d.ntp_dst !== undefined) {
-            const flip = document.getElementById('flip-dst');
+            const flip = document.getElementById('sw-dst');
             if (flip) flip.classList.toggle('active', d.ntp_dst === 1);
           }
           if (d.system_time) document.getElementById('cfg-clock-display').innerText = d.system_time;
 
+          // Recording settings
+          if (d.rec_enabled !== undefined) {
+            const rSw = document.getElementById('sw-rec-enable');
+            if (rSw) rSw.classList.toggle('active', d.rec_enabled === true);
+          }
+          if (d.rec_interval) {
+            const selInt = document.getElementById('sel-rec-interval');
+            if (selInt) selInt.value = d.rec_interval;
+          }
+
+          // Camera sensor initial values
+          if (d.framesize !== undefined) document.getElementById('sel-res').value = d.framesize;
           if (d.fps) {
             document.getElementById('rng-fps').value = d.fps;
             document.getElementById('disp-fps').innerText = d.fps;
@@ -1556,11 +1854,41 @@ const char index_html[] PROGMEM = R"rawliteral(
             document.getElementById('hud-fps').innerText = d.fps + ' FPS';
             document.getElementById('stat-fps').innerText = '⚡ ' + d.fps + ' FPS';
           }
+          if (d.quality !== undefined) {
+            document.getElementById('rng-quality').value = d.quality;
+            document.getElementById('disp-quality').innerText = d.quality;
+          }
+          if (d.brightness !== undefined) {
+            document.getElementById('rng-bright').value = d.brightness;
+            document.getElementById('disp-bright').innerText = d.brightness;
+          }
+          if (d.contrast !== undefined) {
+            document.getElementById('rng-contrast').value = d.contrast;
+            document.getElementById('disp-contrast').innerText = d.contrast;
+          }
+          if (d.saturation !== undefined) {
+            document.getElementById('rng-sat').value = d.saturation;
+            document.getElementById('disp-sat').innerText = d.saturation;
+          }
+          if (d.special_effect !== undefined) document.getElementById('sel-effect').value = d.special_effect;
+          if (d.wb_mode !== undefined) document.getElementById('sel-wb').value = d.wb_mode;
+          if (d.gainceiling !== undefined) document.getElementById('sel-gainceiling').value = d.gainceiling;
+
+          // Toggles
+          if (d.aec !== undefined) document.getElementById('sw-aec').classList.toggle('active', d.aec === 1);
+          if (d.aec2 !== undefined) document.getElementById('sw-aec2').classList.toggle('active', d.aec2 === 1);
+          if (d.agc !== undefined) document.getElementById('sw-agc').classList.toggle('active', d.agc === 1);
+          if (d.awb_gain !== undefined) document.getElementById('sw-awb-gain').classList.toggle('active', d.awb_gain === 1);
+          if (d.bpc !== undefined) document.getElementById('sw-bpc').classList.toggle('active', d.bpc === 1);
+          if (d.wpc !== undefined) document.getElementById('sw-wpc').classList.toggle('active', d.wpc === 1);
+          if (d.lenc !== undefined) document.getElementById('sw-lenc').classList.toggle('active', d.lenc === 1);
+          if (d.vflip !== undefined) document.getElementById('sw-vflip').classList.toggle('active', d.vflip === 1);
+          if (d.hmirror !== undefined) document.getElementById('sw-hmirror').classList.toggle('active', d.hmirror === 1);
         });
     }
 
     function saveSettings() {
-      const isDst = document.getElementById('flip-dst').classList.contains('active');
+      const isDst = document.getElementById('sw-dst').classList.contains('active');
       const params = new URLSearchParams({
         mdns_name: document.getElementById('cfg-mdns').value,
         wifi_ssid: document.getElementById('cfg-ssid').value,

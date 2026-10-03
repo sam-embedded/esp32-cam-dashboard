@@ -130,6 +130,56 @@ void sd_save_photo(uint8_t* buf, size_t len) {
     xSemaphoreGive(g_sd_mutex);
 }
 
+// ─── Recursive file and directory deletion ───────────────────
+static bool sd_delete_recursive_internal(const String& path) {
+    if (path.isEmpty() || path == "/") return false; // Protect root
+
+    File f = SD_MMC.open(path.c_str());
+    if (!f) {
+        return SD_MMC.remove(path.c_str());
+    }
+
+    if (!f.isDirectory()) {
+        f.close();
+        return SD_MMC.remove(path.c_str());
+    }
+
+    // Traverse directory and recursively delete all contents
+    File entry = f.openNextFile();
+    while (entry) {
+        String childName = String(entry.name());
+        int lastSlash = childName.lastIndexOf('/');
+        String shortName = (lastSlash >= 0) ? childName.substring(lastSlash + 1) : childName;
+        String childPath = path;
+        if (!childPath.endsWith("/")) childPath += "/";
+        childPath += shortName;
+        bool isChildDir = entry.isDirectory();
+        entry.close();
+
+        if (isChildDir) {
+            sd_delete_recursive_internal(childPath);
+        } else {
+            SD_MMC.remove(childPath.c_str());
+        }
+        entry = f.openNextFile();
+    }
+    f.close();
+    return SD_MMC.rmdir(path.c_str());
+}
+
+bool sd_delete_item(const String& path) {
+    if (!g_sd_mounted || path.isEmpty() || path == "/") return false;
+    String cleanPath = path;
+    if (!cleanPath.startsWith("/")) cleanPath = "/" + cleanPath;
+
+    if (xSemaphoreTake(g_sd_mutex, pdMS_TO_TICKS(5000)) != pdTRUE) {
+        return false;
+    }
+    bool ok = sd_delete_recursive_internal(cleanPath);
+    xSemaphoreGive(g_sd_mutex);
+    return ok;
+}
+
 // ─── Auto-delete oldest video when space is low ──────────────
 static void autoCleanVideos() {
     uint64_t free_bytes = SD_MMC.totalBytes() - SD_MMC.usedBytes();

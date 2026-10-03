@@ -24,7 +24,7 @@
 extern Preferences       preferences;
 extern SemaphoreHandle_t camera_mutex;
 int                      g_flash_pin = 4;   // GPIO4 on AI-Thinker
-static int               g_stream_fps = 25; // Default FPS
+int                      g_stream_fps = 25; // Default FPS
 static httpd_handle_t camera_httpd = nullptr;  // port 80 – UI + API
 static httpd_handle_t stream_httpd = nullptr;  // port 81 – MJPEG only
 
@@ -231,6 +231,12 @@ static esp_err_t control_handler(httpd_req_t* req) {
     else if (!strcmp(var, "flash")) {
         digitalWrite(g_flash_pin, value ? HIGH : LOW);
     }
+    else if (!strcmp(var, "rec_enabled")) {
+        preferences.putBool("rec_enabled", value ? true : false);
+    }
+    else if (!strcmp(var, "rec_interval")) {
+        if (value >= 1 && value <= 120) preferences.putInt("rec_interval", value);
+    }
 
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     return httpd_resp_send(req, nullptr, 0);
@@ -296,7 +302,8 @@ static esp_err_t telemetry_handler(httpd_req_t* req) {
 static esp_err_t system_get_handler(httpd_req_t* req) {
     String timeStr = ntp_get_formatted_time();
 
-    char json[768];
+    sensor_t* s = esp_camera_sensor_get();
+    char json[1152];
     snprintf(json, sizeof(json),
         "{"
         "\"mdns\":\"%s\","
@@ -310,7 +317,26 @@ static esp_err_t system_get_handler(httpd_req_t* req) {
         "\"ntp_server2\":\"%s\","
         "\"ntp_offset\":%ld,"
         "\"ntp_dst\":%d,"
-        "\"system_time\":\"%s\""
+        "\"system_time\":\"%s\","
+        "\"framesize\":%d,"
+        "\"quality\":%d,"
+        "\"brightness\":%d,"
+        "\"contrast\":%d,"
+        "\"saturation\":%d,"
+        "\"special_effect\":%d,"
+        "\"wb_mode\":%d,"
+        "\"awb\":%d,"
+        "\"awb_gain\":%d,"
+        "\"aec\":%d,"
+        "\"aec2\":%d,"
+        "\"ae_level\":%d,"
+        "\"agc\":%d,"
+        "\"gainceiling\":%d,"
+        "\"bpc\":%d,"
+        "\"wpc\":%d,"
+        "\"lenc\":%d,"
+        "\"vflip\":%d,"
+        "\"hmirror\":%d"
         "}",
         preferences.getString("mdns_name",    "esp32cam").c_str(),
         preferences.getString("wifi_ssid",    "FTTH").c_str(),
@@ -318,12 +344,31 @@ static esp_err_t system_get_handler(httpd_req_t* req) {
         preferences.getString("tg_chat_id",   "318862528").c_str(),
         preferences.getBool("rec_enabled",    true) ? "true" : "false",
         preferences.getUInt("rec_interval",   15),
-        preferences.getInt("cam_fps",         25),
+        g_stream_fps,
         preferences.getString("ntp_server1",  "pool.ntp.org").c_str(),
         preferences.getString("ntp_server2",  "time.nist.gov").c_str(),
         preferences.getLong("ntp_offset",     19800),
         preferences.getInt("ntp_dst",         0),
-        timeStr.c_str()
+        timeStr.c_str(),
+        s ? s->status.framesize : 6,
+        s ? s->status.quality : 14,
+        s ? s->status.brightness : 0,
+        s ? s->status.contrast : 0,
+        s ? s->status.saturation : 0,
+        s ? s->status.special_effect : 0,
+        s ? s->status.wb_mode : 0,
+        s ? s->status.awb : 1,
+        s ? s->status.awb_gain : 1,
+        s ? s->status.aec : 1,
+        s ? s->status.aec2 : 0,
+        s ? s->status.ae_level : 0,
+        s ? s->status.agc : 1,
+        s ? (int)s->status.gainceiling : 0,
+        s ? s->status.bpc : 0,
+        s ? s->status.wpc : 1,
+        s ? s->status.lenc : 0,
+        s ? s->status.vflip : 0,
+        s ? s->status.hmirror : 0
     );
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
@@ -509,50 +554,82 @@ static esp_err_t sd_list_handler(httpd_req_t* req) {
     return httpd_resp_send(req, json.c_str(), json.length());
 }
 
-// ─── SD card delete (Single, batch, and folder support) ───────
+// ─── SD card delete (Single, batch, and recursive folder support) ──
 static esp_err_t sd_delete_handler(httpd_req_t* req) {
     char query[512] = {};
     httpd_req_get_url_query_str(req, query, sizeof(query));
     char raw_name[384] = {};
     if (httpd_query_key_value(query, "name", raw_name, sizeof(raw_name)) != ESP_OK) {
-        httpd_query_key_value(query, "path", raw_name, sizeof(raw_name));
+        if (httpd_query_key_value(query, "names", raw_name, sizeof(raw_name)) != ESP_OK) {
+            httpd_query_key_value(query, "path", raw_name, sizeof(raw_name));
+        }
     }
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     if (!sd_is_mounted() || !raw_name[0]) {
-        return httpd_resp_send(req, "{\"ok\":false,\"err\":\"No file specified\"}", 38);
+        return httpd_resp_send(req, "{\"ok\":false,\"err\":\"No file or folder specified\"}", 48);
     }
 
     String s = urlDecode(raw_name);
-    if (xSemaphoreTake(g_sd_mutex, pdMS_TO_TICKS(3000)) != pdTRUE) {
-        return httpd_resp_send(req, "{\"ok\":false,\"err\":\"SD card busy\"}", 32);
-    }
-
+    int deleted = 0;
+    int failed = 0;
     int start = 0;
     for (int i = 0; i <= (int)s.length(); i++) {
         if (i == (int)s.length() || s[i] == ',') {
             String item = s.substring(start, i);
             item.trim();
-            if (item.length() > 0) {
+            if (item.length() > 0 && item != "/") {
                 if (!item.startsWith("/")) item = "/" + item;
                 Serial.printf("[SD] Deleting item: %s\n", item.c_str());
-                if (SD_MMC.exists(item.c_str())) {
-                    File f = SD_MMC.open(item.c_str());
-                    if (f && f.isDirectory()) {
-                        f.close();
-                        SD_MMC.rmdir(item.c_str());
-                    } else {
-                        if (f) f.close();
-                        SD_MMC.remove(item.c_str());
-                    }
+                if (sd_delete_item(item)) {
+                    deleted++;
                 } else {
-                    SD_MMC.remove(item.c_str());
+                    failed++;
                 }
             }
             start = i + 1;
         }
     }
-    xSemaphoreGive(g_sd_mutex);
-    return httpd_resp_send(req, "{\"ok\":true}", 11);
+
+    char resp[128];
+    snprintf(resp, sizeof(resp), "{\"ok\":%s,\"deleted\":%d,\"failed\":%d}",
+             (deleted > 0 || failed == 0) ? "true" : "false", deleted, failed);
+    return httpd_resp_send(req, resp, strlen(resp));
+}
+
+// ─── XiaoZhi AI Web Chat Endpoint ─────────────────────────────
+static esp_err_t xiaozhi_chat_handler(httpd_req_t* req) {
+    char query[256] = {};
+    httpd_req_get_url_query_str(req, query, sizeof(query));
+    char raw_prompt[192] = {};
+    httpd_query_key_value(query, "q", raw_prompt, sizeof(raw_prompt));
+
+    String prompt = urlDecode(raw_prompt);
+    if (prompt.isEmpty()) {
+        char postBuf[256] = {};
+        int ret = httpd_req_recv(req, postBuf, sizeof(postBuf) - 1);
+        if (ret > 0) prompt = String(postBuf);
+    }
+
+    prompt.trim();
+    if (prompt.isEmpty()) prompt = "help";
+
+    String answer = xiaozhi_ai_chat(prompt);
+
+    // Escape answer for JSON
+    String escaped = "";
+    for (size_t i = 0; i < answer.length(); i++) {
+        char c = answer[i];
+        if (c == '"') escaped += "\\\"";
+        else if (c == '\\') escaped += "\\\\";
+        else if (c == '\n') escaped += "\\n";
+        else if (c == '\r') continue;
+        else escaped += c;
+    }
+
+    String json = "{\"ok\":true,\"reply\":\"" + escaped + "\"}";
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    return httpd_resp_send(req, json.c_str(), json.length());
 }
 
 // ─── SD card download / inline preview ────────────────────────
@@ -761,7 +838,7 @@ void startCameraServer() {
     httpd_config_t config    = HTTPD_DEFAULT_CONFIG();
     config.server_port       = 80;
     config.ctrl_port         = 32769;   // different ctrl socket port
-    config.max_uri_handlers  = 24;
+    config.max_uri_handlers  = 28;
     config.max_open_sockets  = 4;       // 4 sockets saves ~15KB internal DRAM
     config.stack_size        = 8192;
     config.task_priority     = 4;
@@ -785,12 +862,15 @@ void startCameraServer() {
         reg("/api/system/flash",    HTTP_GET,  flash_handler);
         reg("/api/system/restart",  HTTP_GET,  restart_handler);
         reg("/api/camera/save",     HTTP_POST, camera_save_handler);
+        reg("/api/xiaozhi/chat",    HTTP_GET,  xiaozhi_chat_handler);
+        reg("/api/xiaozhi/chat",    HTTP_POST, xiaozhi_chat_handler);
         reg("/api/telegram/test_msg",   HTTP_POST, telegram_test_msg_handler);
         reg("/api/telegram/test_photo", HTTP_POST, telegram_test_photo_handler);
         reg("/api/telegram/test_https", HTTP_GET,  telegram_test_https_handler);
         reg("/api/sdcard/info",     HTTP_GET,  sd_info_handler);
         reg("/api/sdcard/list",     HTTP_GET,  sd_list_handler);
         reg("/api/sdcard/delete",   HTTP_GET,  sd_delete_handler);
+        reg("/api/sdcard/delete",   HTTP_POST, sd_delete_handler);
         reg("/api/sdcard/download", HTTP_GET,  sd_download_handler);
         reg("/api/sdcard/format",   HTTP_GET,  sd_format_handler);
         reg("/ota",                 HTTP_POST, ota_post_handler);

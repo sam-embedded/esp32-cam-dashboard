@@ -284,21 +284,202 @@ static bool isChatAuthorized(const String& chat_id) {
     return false;
 }
 
+// ─── XiaoZhi AI (小智) Edge Agent Engine ───────────────────────
+String xiaozhi_ai_chat(const String& prompt) {
+    String text = prompt;
+    text.trim();
+    String lower = text;
+    lower.toLowerCase();
+
+    // 1. Photo / Capture
+    if (lower.indexOf("photo") >= 0 || lower.indexOf("snap") >= 0 || lower.indexOf("picture") >= 0 ||
+        lower.indexOf("capture") >= 0 || lower.indexOf("look") >= 0 || lower.indexOf("see") >= 0 ||
+        lower.indexOf("拍照") >= 0 || lower.indexOf("看") >= 0 || lower == "/photo") {
+        telegram_send_photo("📸 XiaoZhi AI Snapshot");
+        return "📸 *XiaoZhi AI:* Live photo captured and queued to Telegram!";
+    }
+
+    // 2. Flash Light Controls
+    if (lower.indexOf("flash on") >= 0 || lower.indexOf("light on") >= 0 || lower.indexOf("torch on") >= 0 ||
+        lower.indexOf("open light") >= 0 || lower.indexOf("开灯") >= 0) {
+        digitalWrite(g_flash_pin, HIGH);
+        return "💡 *XiaoZhi AI:* Flash spotlight is now **ON**!";
+    }
+    if (lower.indexOf("flash off") >= 0 || lower.indexOf("light off") >= 0 || lower.indexOf("torch off") >= 0 ||
+        lower.indexOf("close light") >= 0 || lower.indexOf("关灯") >= 0) {
+        digitalWrite(g_flash_pin, LOW);
+        return "💡 *XiaoZhi AI:* Flash spotlight is now **OFF**.";
+    }
+    if (lower == "/flash" || lower == "flash" || lower == "toggle light" || lower == "light") {
+        int cur = digitalRead(g_flash_pin);
+        int next = (cur == HIGH) ? LOW : HIGH;
+        digitalWrite(g_flash_pin, next);
+        return (next == HIGH) ? "💡 *XiaoZhi AI:* Flash toggled **ON**!" : "💡 *XiaoZhi AI:* Flash toggled **OFF**.";
+    }
+
+    // 3. Status & Health
+    if (lower.indexOf("status") >= 0 || lower.indexOf("health") >= 0 || lower.indexOf("sys") >= 0 ||
+        lower.indexOf("info") >= 0 || lower.indexOf("state") >= 0 || lower.indexOf("uptime") >= 0 ||
+        lower.indexOf("状态") >= 0) {
+        uint32_t up = millis() / 1000;
+        uint64_t totalBytes = 0, usedBytes = 0;
+        sd_get_info(totalBytes, usedBytes);
+        uint32_t freeMB = (totalBytes > usedBytes) ? (uint32_t)((totalBytes - usedBytes) / (1024 * 1024)) : 0;
+        sensor_t* s = esp_camera_sensor_get();
+        int fs = s ? s->status.framesize : 6;
+        const char* resStr = (fs == 10) ? "UXGA (1600x1200)" :
+                             (fs == 9)  ? "SXGA (1280x1024)" :
+                             (fs == 8)  ? "XGA (1024x768)" :
+                             (fs == 7)  ? "SVGA (800x600)" :
+                             (fs == 6)  ? "VGA (640x480)" :
+                             (fs == 5)  ? "CIF (400x296)" : "QVGA (320x240)";
+        extern volatile bool g_recording_active;
+        extern int g_stream_fps;
+
+        char buf[512];
+        snprintf(buf, sizeof(buf),
+            "🤖 *XiaoZhi AI (小智) Status Report*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🌐 IP: `%s` (%s.local)\n"
+            "📶 WiFi Signal: `%d dBm`\n"
+            "🧠 Free Heap: `%d KB` | PSRAM: `%d KB`\n"
+            "⏱️ Uptime: `%ud %uh %um %us`\n"
+            "🕒 Clock: `%s`\n"
+            "💾 SD Card: `%s` (%uMB free)\n"
+            "🎥 Sensor: `%s @ %d FPS`\n"
+            "🔴 Recording: `%s`\n"
+            "💡 Flash: `%s`\n"
+            "━━━━━━━━━━━━━━━━━━━━",
+            WiFi.localIP().toString().c_str(),
+            preferences.getString("mdns_name", "esp32cam").c_str(),
+            WiFi.RSSI(),
+            esp_get_free_heap_size() / 1024,
+            heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024,
+            up / 86400, (up % 86400) / 3600, (up % 3600) / 60, up % 60,
+            ntp_get_formatted_time().c_str(),
+            sd_is_mounted() ? "Mounted ✅" : "Not mounted ❌",
+            freeMB,
+            resStr, g_stream_fps,
+            (sd_is_mounted() && g_recording_active) ? "Active 🔴" : "Idle",
+            digitalRead(g_flash_pin) ? "ON 💡" : "OFF"
+        );
+        return String(buf);
+    }
+
+    // 4. IP / Web Links
+    if (lower.indexOf("ip") >= 0 || lower.indexOf("url") >= 0 || lower.indexOf("link") >= 0 ||
+        lower.indexOf("address") >= 0 || lower.indexOf("dashboard") >= 0) {
+        String ip = WiFi.localIP().toString();
+        String mdns = preferences.getString("mdns_name", "esp32cam");
+        return "🌐 *XiaoZhi AI Links:*\n• Web UI: http://" + ip + "\n• mDNS: http://" + mdns + ".local\n• Live Stream: http://" + ip + ":81/stream";
+    }
+
+    // 5. SD Storage
+    if (lower.indexOf("sd") >= 0 || lower.indexOf("disk") >= 0 || lower.indexOf("storage") >= 0) {
+        if (!sd_is_mounted()) return "⚠️ *XiaoZhi AI:* SD Card is not mounted.";
+        uint64_t total = 0, used = 0;
+        sd_get_info(total, used);
+        uint32_t totMB  = (uint32_t)(total / (1024 * 1024));
+        uint32_t usedMB = (uint32_t)(used / (1024 * 1024));
+        uint32_t freeMB = totMB - usedMB;
+        int pct = totMB > 0 ? (usedMB * 100) / totMB : 0;
+        char buf[220];
+        snprintf(buf, sizeof(buf),
+            "💾 *XiaoZhi AI SD Card:*\nUsed: %uMB / %uMB (%d%%) | Free: %uMB\nStatus: Mounted & Healthy ✅",
+            usedMB, totMB, pct, freeMB);
+        return String(buf);
+    }
+
+    // 6. Video Recording Toggle
+    if (lower.indexOf("record on") >= 0 || lower.indexOf("start record") >= 0) {
+        preferences.putBool("rec_enabled", true);
+        return "🎬 *XiaoZhi AI:* 24/7 Video recording has been **STARTED**! Saving AVI files to SD card.";
+    }
+    if (lower.indexOf("record off") >= 0 || lower.indexOf("stop record") >= 0) {
+        preferences.putBool("rec_enabled", false);
+        return "🎬 *XiaoZhi AI:* 24/7 Video recording is now **PAUSED**.";
+    }
+
+    // 7. Resolution Control
+    sensor_t* s = esp_camera_sensor_get();
+    if (s && (lower.indexOf("vga") >= 0 || lower == "/vga")) {
+        s->set_framesize(s, FRAMESIZE_VGA);
+        return "🎥 *XiaoZhi AI:* Resolution set to **VGA (640x480)** real-time stream.";
+    }
+    if (s && (lower.indexOf("uxga") >= 0 || lower.indexOf("2mp") >= 0 || lower.indexOf("high res") >= 0)) {
+        s->set_framesize(s, FRAMESIZE_UXGA);
+        return "🎥 *XiaoZhi AI:* Resolution set to **UXGA (1600x1200)** 2MP High-Def.";
+    }
+    if (s && lower.indexOf("qvga") >= 0) {
+        s->set_framesize(s, FRAMESIZE_QVGA);
+        return "🎥 *XiaoZhi AI:* Resolution set to **QVGA (320x240)** fast mode.";
+    }
+
+    // 8. Flips
+    if (s && (lower.indexOf("vflip") >= 0 || lower == "flip")) {
+        int next = s->status.vflip ? 0 : 1;
+        s->set_vflip(s, next);
+        return next ? "🔄 *XiaoZhi AI:* Vertical flip is now **ON**" : "🔄 *XiaoZhi AI:* Vertical flip is now **OFF**";
+    }
+    if (s && (lower.indexOf("hmirror") >= 0 || lower == "mirror")) {
+        int next = s->status.hmirror ? 0 : 1;
+        s->set_hmirror(s, next);
+        return next ? "🪞 *XiaoZhi AI:* Horizontal mirror is now **ON**" : "🪞 *XiaoZhi AI:* Horizontal mirror is now **OFF**";
+    }
+
+    // 9. Time
+    if (lower.indexOf("time") >= 0 || lower.indexOf("clock") >= 0 || lower.indexOf("几点") >= 0) {
+        return "🕒 *XiaoZhi AI Clock:* `" + ntp_get_formatted_time() + "`";
+    }
+
+    // 10. Reboot
+    if (lower.indexOf("reboot") >= 0 || lower.indexOf("restart") >= 0 || lower.indexOf("reset") >= 0 || lower.indexOf("重启") >= 0) {
+        return "🔄 *XiaoZhi AI:* Rebooting ESP32-CAM now... I will be back online in ~10 seconds!";
+    }
+
+    // 11. Greetings & Help
+    if (lower == "hi" || lower == "hello" || lower == "hey" || lower.indexOf("who are you") >= 0 ||
+        lower.indexOf("小智") >= 0 || lower.indexOf("你好") >= 0 || lower.indexOf("你是谁") >= 0 ||
+        lower.startsWith("/start") || lower.startsWith("/help") || lower == "help") {
+        return "✨ *XiaoZhi AI (小智) Agent Online!*\n"
+               "I am your intelligent autonomous agent running natively on ESP32-CAM.\n\n"
+               "🗣️ *Natural Language Commands:*\n"
+               "• `Take a photo` / `look` — Capture & send live photo\n"
+               "• `Turn on flash` / `flash off` — Toggle spotlight\n"
+               "• `Status` / `health` — View live hardware telemetry\n"
+               "• `IP address` — Get web dashboard links\n"
+               "• `SD card` — Check storage usage\n"
+               "• `VGA` / `UXGA` — Tune camera resolution\n"
+               "• `Flip` / `Mirror` — Rotate image orientation\n"
+               "• `Start recording` / `Stop recording`\n"
+               "• `Reboot` — Safely restart device";
+    }
+
+    // 12. Fallback
+    return "🤖 *XiaoZhi AI:* I received: _\"" + text + "\"_\n\n"
+           "You can ask me to take a photo (`photo`), turn on the light (`flash on`), report health (`status`), or adjust resolution. Type `help` for full controls!";
+}
+
 // ─── Command Processor for Incoming Telegram Messages ────────
 static void handleNewMessages(int numNewMessages) {
     for (int i = 0; i < numNewMessages; i++) {
         String chat_id = g_bot->messages[i].chat_id;
         String text    = g_bot->messages[i].text;
         text.trim();
-        text.toLowerCase();
 
         if (!isChatAuthorized(chat_id)) {
             g_bot->sendMessage(chat_id, "⛔ *Unauthorized access.* Your Chat ID is `" + chat_id + "`.", "Markdown");
             continue;
         }
 
-        if (text == "/photo" || text == "photo" || text == "📷 photo") {
-            g_bot->sendMessage(chat_id, "📸 *Capturing live photo...*", "Markdown");
+        String lower = text;
+        lower.toLowerCase();
+
+        // Check for direct photo capture command
+        if (lower == "/photo" || lower == "photo" || lower == "📷 photo" || lower.indexOf("take a photo") >= 0 ||
+            lower.indexOf("take photo") >= 0 || lower.indexOf("拍照") >= 0 || lower.indexOf("看一眼") >= 0) {
+            
+            g_bot->sendMessage(chat_id, "📸 *XiaoZhi AI:* Capturing live photo from camera...", "Markdown");
 
             uint8_t* jpg_buf = nullptr;
             size_t   jpg_len = 0;
@@ -328,62 +509,30 @@ static void handleNewMessages(int numNewMessages) {
                                          getNextPhotoByte,
                                          nullptr, nullptr);
 
+                String caption = "✨ *XiaoZhi AI Live Snapshot*\n🕒 `" + ntp_get_formatted_time() + "`";
+                g_bot->sendMessage(chat_id, caption, "Markdown");
+
                 free(jpg_buf);
                 g_current_fb_buf = nullptr;
                 g_current_fb_len = 0;
             } else {
-                g_bot->sendMessage(chat_id, "❌ *Camera capture failed!* Camera busy or error.", "Markdown");
+                g_bot->sendMessage(chat_id, "❌ *XiaoZhi AI:* Camera capture failed (busy or error).", "Markdown");
             }
-        } else if (text == "/flash" || text == "flash" || text == "💡 flash") {
-            int cur = digitalRead(g_flash_pin);
-            int next = (cur == HIGH) ? LOW : HIGH;
-            digitalWrite(g_flash_pin, next);
-            g_bot->sendMessage(chat_id, (next == HIGH) ? "💡 Flash turned *ON*" : "💡 Flash turned *OFF*", "Markdown");
-        } else if (text == "/flash on" || text == "flash on") {
-            digitalWrite(g_flash_pin, HIGH);
-            g_bot->sendMessage(chat_id, "💡 Flash turned *ON*", "Markdown");
-        } else if (text == "/flash off" || text == "flash off") {
-            digitalWrite(g_flash_pin, LOW);
-            g_bot->sendMessage(chat_id, "💡 Flash turned *OFF*", "Markdown");
-        } else if (text == "/status" || text == "status" || text == "📊 status") {
-            uint32_t up = millis() / 1000;
-            char buf[320];
-            snprintf(buf, sizeof(buf),
-                "📊 *ESP32-CAM Status*\n"
-                "🌐 IP: `%s`\n"
-                "📶 WiFi RSSI: `%d dBm`\n"
-                "🧠 Free Heap: `%d KB`\n"
-                "🧠 Free PSRAM: `%d KB`\n"
-                "⏱️ Uptime: `%ud %uh %um %us`\n"
-                "💾 SD Card: `%s`",
-                WiFi.localIP().toString().c_str(),
-                WiFi.RSSI(),
-                esp_get_free_heap_size() / 1024,
-                heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024,
-                up/86400, (up%86400)/3600, (up%3600)/60, up%60,
-                sd_is_mounted() ? "Mounted ✅" : "Not mounted ❌"
-            );
-            g_bot->sendMessage(chat_id, buf, "Markdown");
-        } else if (text == "/restart" || text == "/reboot" || text == "restart" || text == "reboot") {
-            g_bot->sendMessage(chat_id, "🔄 *Rebooting ESP32-CAM now...*", "Markdown");
-            vTaskDelay(pdMS_TO_TICKS(1000));
+            continue;
+        }
+
+        // Process message through XiaoZhi AI Agent Engine
+        String response = xiaozhi_ai_chat(text);
+        g_bot->sendMessage(chat_id, response, "Markdown");
+
+        // If reboot was requested, delay briefly then restart
+        if (lower.indexOf("reboot") >= 0 || lower.indexOf("restart") >= 0 || lower.indexOf("reset") >= 0 || lower.indexOf("重启") >= 0) {
+            vTaskDelay(pdMS_TO_TICKS(1500));
             esp_restart();
-        } else if (text.startsWith("/help") || text.startsWith("/start") || text == "help" || text == "start") {
-            g_bot->sendMessage(
-                chat_id,
-                "🤖 *LunaCamBot Commands*\n\n"
-                "📸 `/photo` — Capture & send a live photo\n"
-                "💡 `/flash` — Toggle flash spotlight\n"
-                "💡 `/flash on` — Turn flash ON\n"
-                "💡 `/flash off` — Turn flash OFF\n"
-                "📊 `/status` — Real-time telemetry & uptime\n"
-                "🔄 `/reboot` — Remote restart device\n"
-                "ℹ️ `/help` — Display this command menu",
-                "Markdown"
-            );
         }
     }
 }
+
 
 // ─── Main FreeRTOS Telegram Task ─────────────────────────────
 void TaskTelegram(void* pvParameters) {

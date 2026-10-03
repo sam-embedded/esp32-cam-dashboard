@@ -24,4 +24,5 @@ void telegram_init();
 void telegram_send_message(const char* text);
 void telegram_send_photo(const char* caption = "");
 String telegram_test_raw_https();
+String xiaozhi_ai_chat(const String& prompt);  // XiaoZhi AI processing
 void TaskTelegram(void* pvParameters);     // FreeRTOS task entry
