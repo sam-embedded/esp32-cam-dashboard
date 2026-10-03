@@ -283,6 +283,7 @@ static esp_err_t telemetry_handler(httpd_req_t* req) {
         "\"mdns\":\"%s\","
         "\"sd_mounted\":%s,"
         "\"cam_ok\":%s,"
+        "\"xz_linked\":%s,"
         "\"framesize\":%d,"
         "\"fps\":%d,"
         "\"flash\":%d,"
@@ -297,6 +298,7 @@ static esp_err_t telemetry_handler(httpd_req_t* req) {
         preferences.getString("mdns_name", "esp32cam").c_str(),
         sd_is_mounted() ? "true" : "false",
         (s != nullptr) ? "true" : "false",
+        xiaozhi_is_device_linked() ? "true" : "false",
         fs,
         g_stream_fps,
         digitalRead(g_flash_pin),

@@ -1530,6 +1530,8 @@ I have full control over camera capture, flash spotlight, SD card storage, and s
       if (secId === 'sd') {
         loadStorageInfo();
         loadDirectory(currentFmPath);
+      } else if (secId === 'ai') {
+        checkXiaoZhiStatus();
       }
     }
 
@@ -1604,6 +1606,9 @@ I have full control over camera capture, flash spotlight, SD card storage, and s
             document.getElementById('stat-status').innerText = 'Sensor Offline';
             const banner = document.getElementById('sensor-offline-banner');
             if (banner) banner.style.display = 'flex';
+          }
+          if (d.xz_linked !== undefined) {
+            updateCodeUI(d.xz_linked ? 'ONLINE' : '', d.xz_linked);
           }
 
           // RSSI
@@ -2126,18 +2131,28 @@ I have full control over camera capture, flash spotlight, SD card storage, and s
           b.style.color = '#4ade80';
         }
       } else {
-        if (code && cd) {
-          cd.innerText = code;
+        const displayCode = (code && code !== 'ONLINE') ? code : '------';
+        if (cd) {
+          cd.innerText = displayCode;
           cd.style.color = '#38bdf8';
           cd.style.textShadow = '0 0 15px rgba(56,189,248,0.5)';
         }
-        if (code && ci) ci.innerText = code;
+        if (ci) ci.innerText = displayCode;
         if (b) {
           b.innerText = 'Unlinked ⚠️';
           b.style.background = 'rgba(234,179,8,0.2)';
           b.style.color = '#facc15';
         }
       }
+    }
+
+    function checkXiaoZhiStatus() {
+      fetch('/api/xiaozhi/code')
+        .then(r => r.json())
+        .then(d => {
+          if (d.ok) updateCodeUI(d.code, d.linked);
+        })
+        .catch(() => {});
     }
 
     function announcePairingCode() {
@@ -2352,7 +2367,7 @@ I have full control over camera capture, flash spotlight, SD card storage, and s
             if (flip) flip.classList.toggle('active', d.ntp_dst === 1);
           }
           if (d.system_time) document.getElementById('cfg-clock-display').innerText = d.system_time;
-          if (d.xz_code) updateCodeUI(d.xz_code, d.xz_linked);
+          if (d.xz_linked !== undefined) updateCodeUI(d.xz_code, d.xz_linked);
 
           // Recording settings
           if (d.rec_enabled !== undefined) {
@@ -2469,6 +2484,7 @@ I have full control over camera capture, flash spotlight, SD card storage, and s
       setInterval(pollTelemetry, 2000);
       loadSystemSettings();
       loadAgentSettings();
+      checkXiaoZhiStatus();
       switchSection('cam');
     });
   </script>
